@@ -3,7 +3,7 @@ name: Build and Release EXE for Windows
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Triggers only on version tags like v1.0.0
 
 jobs:
   build-and-release:
@@ -16,13 +16,14 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: 3.x  # Replace 3.x with your required version
 
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if (Test-Path requirements.txt) {
+          pip install -r requirements.txt
+        }
 
     - name: Build EXE
       run: |
