@@ -14,26 +14,6 @@ def check_admin_privileges():
         return False
 
 
-def check_dependencies():
-    """Check if required dependencies are available."""
-    dependencies = ['curl', 'powershell', 'sc']
-    missing_deps = []
-
-    for dep in dependencies:
-        try:
-            subprocess.run([dep, '--version'],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL,
-                           check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            missing_deps.append(dep)
-
-    if missing_deps:
-        print(f"Missing dependencies: {missing_deps}")
-        return False
-    return True
-
-
 def download_ngrok():
     """Download and install ngrok on Windows."""
     ngrok_url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip"
@@ -125,9 +105,6 @@ def main():
         print("Script must be run with administrator privileges")
         sys.exit(1)
 
-    # Check dependencies
-    if not check_dependencies():
-        sys.exit(1)
 
     # Step 1: Download and install ngrok
     ngrok_path = download_ngrok()
