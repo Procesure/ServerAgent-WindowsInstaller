@@ -18,14 +18,14 @@ def download_ngrok():
     """Download and install ngrok on Windows."""
     ngrok_url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip"
     ngrok_zip = "ngrok.zip"
-    ngrok_dir = r"C:\ngrok"
+    ngrok_dir = r"C:\procesure"
 
     try:
         # Ensure ngrok directory exists
         Path(ngrok_dir).mkdir(parents=True, exist_ok=True)
 
         # Download ngrok
-        print("Downloading ngrok...")
+        print("Downloading procesure agent...")
         subprocess.run(["curl", "-Lo", ngrok_zip, ngrok_url], check=True)
 
         # Extract ngrok
@@ -40,7 +40,7 @@ def download_ngrok():
         if not os.path.exists(ngrok_exe_path):
             raise FileNotFoundError("ngrok.exe not found after extraction")
 
-        print(f"ngrok installed in {ngrok_dir}")
+        print(f"Procesure agent installed in {ngrok_dir}")
         return ngrok_exe_path
 
     except Exception as e:
@@ -83,7 +83,7 @@ def setup_ngrok_service(ngrok_path):
     """Set up ngrok as a Windows service using the specified configuration file."""
     try:
         # Command to install ngrok service with the given configuration file
-        config_path = r"C:\ngrok\ngrok.yml"
+        config_path = r"C:\procesure\agent.yml"
         service_command = [ngrok_path, "service", "install", "--config", config_path]
 
         # Run the ngrok service installation command
@@ -104,7 +104,6 @@ def main():
     if not check_admin_privileges():
         print("Script must be run with administrator privileges")
         sys.exit(1)
-
 
     # Step 1: Download and install ngrok
     ngrok_path = download_ngrok()
