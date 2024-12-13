@@ -9,6 +9,9 @@ jobs:
   build-and-release:
     runs-on: windows-latest
 
+    permissions:
+      contents: write  # Ensure the token has write access to create releases
+
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v3
@@ -46,7 +49,6 @@ jobs:
           Automatic release of the executable for Windows.
         draft: false
         prerelease: false
-        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
