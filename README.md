@@ -51,4 +51,4 @@ If you encounter any issues, please open a GitHub issue with detailed informatio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Distributed under the MIT License. See LICENSE.txt for more information.
+Distributed under the MIT License. See LICENSE for more information.
