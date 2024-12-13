@@ -26,7 +26,7 @@ jobs:
 
     - name: Build Windows EXE
       run: |
-        pyinstaller --onefile --windowed main.py
+        pyinstaller --onefile --windowed --name agent main.py
 
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -34,6 +34,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/main.exe
-        asset_name: main.exe
+        asset_path: ./dist/agent.exe
+        asset_name: agent.exe
         asset_content_type: application/octet-stream
