@@ -1,7 +1,6 @@
 import os
 import sys
 import subprocess
-import winreg
 from pathlib import Path
 
 
