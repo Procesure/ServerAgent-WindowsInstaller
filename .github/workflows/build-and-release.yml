@@ -10,7 +10,7 @@ jobs:
     runs-on: windows-latest
 
     permissions:
-      contents: write  # Ensure the token has write access to create releases
+      contents: write
 
     steps:
     - name: Checkout Repository
@@ -40,7 +40,19 @@ jobs:
       env:
         PYTHONPATH: ${{ runner.workspace }}
 
-    - name: Create Release
+    - name: Check if Release Exists
+      id: release_check
+      run: |
+        $response = gh release view ${{ github.ref_name }} --json tagName --jq .tagName
+        if ($response) {
+          echo "Release already exists."
+        } else {
+          echo "Release does not exist."
+        }
+      continue-on-error: true
+
+    - name: Create Release (if not exists)
+      if: steps.release_check.outputs.response != 'Release already exists.'
       uses: actions/create-release@v1
       with:
         tag_name: ${{ github.ref_name }}
@@ -59,3 +71,5 @@ jobs:
         asset_path: dist/main.exe
         asset_name: main.exe
         asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
