@@ -5,7 +5,9 @@ from pathlib import Path
 
 
 def check_admin_privileges():
+
     """Check if the script is running with administrator privileges."""
+
     try:
         import ctypes
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
@@ -14,11 +16,64 @@ def check_admin_privileges():
         return False
 
 
+def download_and_install_open_ssh():
+
+    """
+    Installs OpenSSH server on Windows if it's not already installed.
+    This function uses PowerShell commands to ensure OpenSSH is available.
+
+    """
+
+    try:
+        # Check if OpenSSH is already installed
+        check_command = [
+            "powershell",
+            "-Command",
+            "Get-WindowsCapability -Online | Where-Object { $_.Name -like '*OpenSSH*' }"
+        ]
+
+        process = subprocess.run(
+            check_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        if "Installed" in process.stdout:
+            print("OpenSSH is already installed on the system.")
+            return
+
+        # Install OpenSSH client and server
+        print("OpenSSH not found. Installing OpenSSH client and server...")
+        install_command = [
+            "powershell",
+            "-Command",
+            "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+        ]
+        subprocess.run(install_command, check=True)
+
+        # Start and enable OpenSSH server service
+        print("Starting and enabling OpenSSH server service...")
+        start_service_command = [
+            "powershell",
+            "-Command",
+            "Start-Service sshd; Set-Service -Name sshd -StartupType Automatic"
+        ]
+        subprocess.run(start_service_command, check=True)
+
+        print("OpenSSH installation and setup complete.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to install or configure OpenSSH: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred during OpenSSH installation: {e}")
+
+
 def download_ngrok():
+
     """Download and install ngrok on Windows."""
     ngrok_url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip"
     ngrok_zip = "ngrok.zip"
-    ngrok_dir = r"C:\procesure"
+    ngrok_dir = r"C:\Program Files\Procesure"
 
     try:
         # Ensure ngrok directory exists
@@ -49,7 +104,9 @@ def download_ngrok():
 
 
 def enable_ssh_rdp():
+
     """Enable SSH and RDP on Windows."""
+
     try:
         print("Enabling SSH and RDP...")
 
@@ -59,6 +116,7 @@ def enable_ssh_rdp():
             "-Command",
             "Set-Service -Name 'sshd' -StartupType Automatic"
         ], check=True)
+
         subprocess.run([
             "powershell",
             "-Command",
@@ -80,10 +138,11 @@ def enable_ssh_rdp():
 
 
 def setup_ngrok_service(ngrok_path):
+
     """Set up ngrok as a Windows service using the specified configuration file."""
     try:
         # Command to install ngrok service with the given configuration file
-        config_path = r"C:\procesure\agent.yml"
+        config_path = r"C:\Program Files\Procesure\agent.yml"
         service_command = [ngrok_path, "service", "install", "--config", config_path]
 
         # Run the ngrok service installation command
@@ -104,6 +163,8 @@ def main():
     if not check_admin_privileges():
         print("Script must be run with administrator privileges")
         sys.exit(1)
+
+    download_and_install_open_ssh()
 
     # Step 1: Download and install ngrok
     ngrok_path = download_ngrok()
