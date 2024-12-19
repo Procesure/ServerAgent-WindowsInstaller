@@ -286,11 +286,13 @@ def setup_ngrok_service(ngrok_path):
         # Command to install ngrok service with the given configuration file
         config_path = r"C:\Program Files\Procesure\agent.yml"
         service_command = [ngrok_path, "service", "install", "--config", config_path]
+        start_command = [ngrok_path, "service", "start"]
 
         # Run the ngrok service installation command
         subprocess.run(service_command, check=True)
+        subprocess.run(start_command, check=True)
 
-        print("ngrok service has been installed and configured.")
+        print("ngrok service has been installed, started and configured.")
 
     except subprocess.CalledProcessError as e:
         print(f"Error setting up ngrok service: {e}")
