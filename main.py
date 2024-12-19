@@ -157,6 +157,11 @@ class WindowsServer2016Setup:
     @staticmethod
     def install_openssh():
         try:
+            subprocess.run(
+                ["powershell", "mkdir c:\openssh-install"],
+                check=True
+            )
+
             # Run both the TLS setup and the download in the same PowerShell command
             subprocess.run(
                 [
@@ -216,13 +221,16 @@ class WindowsServer2016Setup:
         except subprocess.CalledProcessError as e:
             print(f"Failed to install OpenSSH on Windows Server 2016: {e}")
             raise
+
     @staticmethod
     def enable_rdp():
         try:
             print("Enabling RDP for Windows Server 2016...")
             commands = [
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
+                ["powershell", "-Command",
+                 "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
+                ["powershell", "-Command",
+                 "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
             ]
 
             for cmd in commands:
@@ -233,6 +241,7 @@ class WindowsServer2016Setup:
         except subprocess.CalledProcessError as e:
             print(f"Error enabling RDP on Windows Server 2016: {e}")
             raise
+
 
 def download_ngrok():
     """Download and install ngrok on Windows."""
