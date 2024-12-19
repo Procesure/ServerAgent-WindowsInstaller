@@ -177,13 +177,16 @@ class WindowsServer2016Setup:
             )
 
             # Allow inbound SSH traffic through the firewall
-            subprocess.run(
-                [
-                    "powershell",
-                    "New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22"
-                ],
-                check=True
-            )
+            try:
+                subprocess.run(
+                    [
+                        "powershell",
+                        "New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22"
+                    ],
+                    check=True
+                )
+            except Exception as e:
+                print(e)
 
             # Start SSH service
             subprocess.run(
