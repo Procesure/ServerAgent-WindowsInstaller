@@ -3,6 +3,8 @@ import sys
 import subprocess
 import platform
 from pathlib import Path
+import zipfile
+import requests
 
 
 def get_windows_version():
@@ -258,21 +260,19 @@ def download_ngrok():
 
         # Download ngrok
         print("Downloading procesure agent...")
-        subprocess.run(["curl", "-o", ngrok_zip, ngrok_url], check=True)
+        response = requests.get(ngrok_url)
+        response.raise_for_status()  # Raise an error for bad HTTP status
+        with open(ngrok_zip, "wb") as f:
+            f.write(response.content)
 
         # Extract ngrok
-        subprocess.run(["tar", "-xf", ngrok_zip, "-C", ngrok_dir], check=True)
+        print("Extracting ngrok...")
+        with zipfile.ZipFile(ngrok_zip, "r") as zip_ref:
+            zip_ref.extractall(ngrok_dir)
 
-        # Remove zip file
-        os.remove(ngrok_zip)
+        print("Ngrok setup completed successfully.")
 
         ngrok_exe_path = os.path.join(ngrok_dir, "ngrok.exe")
-
-        # Verify ngrok is installed
-        if not os.path.exists(ngrok_exe_path):
-            raise FileNotFoundError("ngrok.exe not found after extraction")
-
-        print(f"Procesure agent installed in {ngrok_dir}")
         return ngrok_exe_path
 
     except Exception as e:
