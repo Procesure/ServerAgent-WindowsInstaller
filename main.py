@@ -1,9 +1,28 @@
 import os
 import sys
-import platform
 import subprocess
+import platform
 from pathlib import Path
 
+def get_windows_version():
+    """Detect Windows version and return version info."""
+    try:
+        output = subprocess.check_output(
+            ["powershell", "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Caption"],
+            text=True
+        )
+
+        if "Windows 10" in output:
+            return "Windows10"
+        elif "Windows 11" in output:
+            return "Windows11"
+        elif "Windows Server 2016" in output:
+            return "WindowsServer2016"
+        else:
+            raise ValueError(f"Unsupported Windows version detected: {output}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error detecting Windows version: {e}")
+        sys.exit(1)
 
 def check_admin_privileges():
     """Check if the script is running with administrator privileges."""
@@ -14,56 +33,180 @@ def check_admin_privileges():
         print("Error checking admin privileges")
         return False
 
+class Windows10Setup:
+    @staticmethod
+    def install_openssh():
+        try:
+            # Check if OpenSSH is already installed
+            check_command = [
+                "powershell",
+                "-Command",
+                "Get-WindowsCapability -Online | Where-Object { $_.Name -like '*OpenSSH*' }"
+            ]
 
-def run_powershell_command(command):
-    """Runs a PowerShell command and returns the output."""
-    try:
-        result = subprocess.run(
-            ["powershell", "-Command", command],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"Error running command: {command}")
-        print(e.stderr)
-        sys.exit(1)
+            process = subprocess.run(check_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
+            if "Installed" in process.stdout:
+                print("OpenSSH is already installed on Windows 10.")
+                return
 
-def get_windows_version():
-    """Retrieve the Windows version and build number."""
-    version = platform.version()
-    release = platform.release()
-    return release, version
+            # Install OpenSSH using Windows 10 specific method
+            print("Installing OpenSSH on Windows 10...")
+            install_command = [
+                "powershell",
+                "-Command",
+                "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+            ]
+            subprocess.run(install_command, check=True)
 
+            # Start and configure service
+            subprocess.run([
+                "powershell",
+                "-Command",
+                "Start-Service sshd; Set-Service -Name sshd -StartupType Automatic"
+            ], check=True)
 
-def install_openssh():
-    """Install OpenSSH based on Windows version."""
-    release, version = get_windows_version()
-    print(f"Detected Windows Version: Release: {release}, Version: {version}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install OpenSSH on Windows 10: {e}")
+            raise
 
-    if int(release) >= 10:  # Windows 10 and Server 2016+
-        print("Installing OpenSSH using Add-WindowsCapability...")
-        commands = [
-            "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
-            "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0",
-            "Start-Service sshd",
-            "Set-Service -Name sshd -StartupType 'Automatic'",
-            "if (!(Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue)) { "
-            "New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd)' -Enabled True "
-            "-Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 }"
-        ]
-    else:
-        print("Manual installation required for this Windows version.")
-        print("Please download OpenSSH from the official repository.")
-        sys.exit(1)
+    @staticmethod
+    def enable_rdp():
+        try:
+            print("Enabling RDP for Windows 10...")
+            commands = [
+                "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 0 /f",
+                "netsh advfirewall firewall set rule group=\"Remote Desktop\" new enable=Yes",
+                "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp\" /v UserAuthentication /t REG_DWORD /d 1 /f"
+            ]
 
-    for command in commands:
-        print(f"Running: {command}")
-        run_powershell_command(command)
-    print("OpenSSH installation and configuration completed.")
+            for cmd in commands:
+                subprocess.run(cmd, shell=True, check=True)
 
+            print("RDP enabled successfully on Windows 10")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error enabling RDP on Windows 10: {e}")
+            raise
+
+class Windows11Setup:
+    @staticmethod
+    def install_openssh():
+        try:
+            # Check if OpenSSH is already installed
+            check_command = [
+                "powershell",
+                "-Command",
+                "Get-WindowsCapability -Online | Where-Object { $_.Name -like '*OpenSSH*' }"
+            ]
+
+            process = subprocess.run(check_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if "Installed" in process.stdout:
+                print("OpenSSH is already installed on Windows 11.")
+                return
+
+            # Install OpenSSH using Windows 11 specific method
+            print("Installing OpenSSH on Windows 11...")
+            install_commands = [
+                "powershell",
+                "-Command",
+                "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0; " +
+                "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0"
+            ]
+            subprocess.run(install_commands, check=True)
+
+            # Configure and start service
+            service_commands = [
+                "powershell",
+                "-Command",
+                "Start-Service sshd; " +
+                "Set-Service -Name sshd -StartupType Automatic; " +
+                "New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22"
+            ]
+            subprocess.run(service_commands, check=True)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install OpenSSH on Windows 11: {e}")
+            raise
+
+    @staticmethod
+    def enable_rdp():
+        try:
+            print("Enabling RDP for Windows 11...")
+            commands = [
+                "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 0 /f",
+                "netsh advfirewall firewall set rule group=\"Remote Desktop\" new enable=Yes",
+                "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp\" /v UserAuthentication /t REG_DWORD /d 1 /f",
+                "reg add \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services\" /v fEnableTerminalServerDR /t REG_DWORD /d 1 /f"  # Enable UDP for better performance
+            ]
+
+            for cmd in commands:
+                subprocess.run(cmd, shell=True, check=True)
+
+            print("RDP enabled successfully on Windows 11")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error enabling RDP on Windows 11: {e}")
+            raise
+
+class WindowsServer2016Setup:
+    @staticmethod
+    def install_openssh():
+        try:
+            # Check if OpenSSH is already installed
+            check_command = [
+                "powershell",
+                "-Command",
+                "Get-WindowsCapability -Online | Where-Object {$_.Name -like 'OpenSSH*'}"
+            ]
+
+            process = subprocess.run(check_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if "Installed" in process.stdout:
+                print("OpenSSH is already installed on Windows Server 2016.")
+                return
+
+            # Install OpenSSH using Windows Server 2016 specific method
+            print("Installing OpenSSH on Windows Server 2016...")
+            install_command = [
+                "powershell",
+                "-Command",
+                "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+            ]
+            subprocess.run(install_command, check=True)
+
+            # Configure and start service
+            service_commands = [
+                "powershell",
+                "-Command",
+                "Start-Service sshd; Set-Service -Name sshd -StartupType 'Automatic'"
+            ]
+            subprocess.run(service_commands, check=True)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install OpenSSH on Windows Server 2016: {e}")
+            raise
+
+    @staticmethod
+    def enable_rdp():
+        try:
+            print("Enabling RDP for Windows Server 2016...")
+            commands = [
+                "powershell -Command Install-WindowsFeature RDS-RD-Server",
+                "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 0 /f",
+                "netsh advfirewall firewall set rule group=\"Remote Desktop\" new enable=Yes",
+                "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp\" /v UserAuthentication /t REG_DWORD /d 1 /f"
+            ]
+
+            for cmd in commands:
+                subprocess.run(cmd, shell=True, check=True)
+
+            print("RDP enabled successfully on Windows Server 2016")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error enabling RDP on Windows Server 2016: {e}")
+            raise
 
 def download_ngrok():
     """Download and install ngrok on Windows."""
@@ -98,39 +241,6 @@ def download_ngrok():
         print(f"Error downloading ngrok: {e}")
         sys.exit(1)
 
-
-def enable_ssh_rdp():
-    """Enable SSH and RDP on Windows."""
-    try:
-        print("Enabling SSH and RDP...")
-
-        # Enable SSH service
-        subprocess.run([
-            "powershell",
-            "-Command",
-            "Set-Service -Name 'sshd' -StartupType Automatic"
-        ], check=True)
-
-        subprocess.run([
-            "powershell",
-            "-Command",
-            "Start-Service 'sshd'"
-        ], check=True)
-
-        # Enable Remote Desktop
-        subprocess.run([
-            "powershell",
-            "-Command",
-            "Set-NetFirewallRule -DisplayGroup 'Remote Desktop' -Enabled True"
-        ], check=True)
-
-        print("SSH and RDP enabled successfully")
-
-    except subprocess.CalledProcessError as e:
-        print(f"Error enabling SSH/RDP: {e}")
-        sys.exit(1)
-
-
 def setup_ngrok_service(ngrok_path):
     """Set up ngrok as a Windows service using the specified configuration file."""
     try:
@@ -150,27 +260,43 @@ def setup_ngrok_service(ngrok_path):
         print(f"Unexpected error: {e}")
         sys.exit(1)
 
-
 def main():
-    # Check for admin privileges
     if not check_admin_privileges():
         print("Script must be run with administrator privileges")
         sys.exit(1)
 
-    # Step 1: Install OpenSSH based on Windows version
-    install_openssh()
+    # Detect Windows version
+    windows_version = get_windows_version()
 
-    # Step 2: Download and install ngrok
-    ngrok_path = download_ngrok()
+    # Create setup instance based on Windows version
+    setup_classes = {
+        "Windows10": Windows10Setup,
+        "Windows11": Windows11Setup,
+        "WindowsServer2016": WindowsServer2016Setup
+    }
 
-    # Step 3: Enable SSH and RDP
-    enable_ssh_rdp()
+    if windows_version not in setup_classes:
+        print(f"Unsupported Windows version: {windows_version}")
+        sys.exit(1)
 
-    # Step 4: Set up ngrok as a service
-    setup_ngrok_service(ngrok_path)
+    setup_class = setup_classes[windows_version]
 
-    print("Setup complete. Ngrok is running as a service.")
+    try:
+        # Install OpenSSH
+        setup_class.install_openssh()
 
+        # Enable RDP
+        setup_class.enable_rdp()
+
+        # Download and setup ngrok (this part remains the same for all versions)
+        ngrok_path = download_ngrok()
+        setup_ngrok_service(ngrok_path)
+
+        print(f"Setup complete for {windows_version}. Ngrok is running as a service.")
+
+    except Exception as e:
+        print(f"Setup failed: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
