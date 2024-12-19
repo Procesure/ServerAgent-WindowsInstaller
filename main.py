@@ -33,6 +33,117 @@ def check_admin_privileges():
         print("Error checking admin privileges")
         return False
 
+class Windows11Setup:
+    @staticmethod
+    def install_openssh():
+        try:
+            # Check if OpenSSH is already installed
+            check_command = [
+                "powershell",
+                "-Command",
+                "Get-WindowsCapability -Online | Where-Object { $_.Name -like '*OpenSSH*' }"
+            ]
+
+            process = subprocess.run(check_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if "Installed" in process.stdout:
+                print("OpenSSH is already installed on Windows 11.")
+                return
+
+            # Install OpenSSH
+            print("Installing OpenSSH on Windows 11...")
+            install_commands = [
+                "powershell",
+                "-Command",
+                "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+            ]
+            subprocess.run(install_commands, check=True)
+
+            # Configure and start service
+            service_commands = [
+                "powershell",
+                "-Command",
+                "Start-Service sshd; Set-Service -Name sshd -StartupType Automatic"
+            ]
+            subprocess.run(service_commands, check=True)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install OpenSSH on Windows 11: {e}")
+            raise
+
+    @staticmethod
+    def enable_rdp():
+        try:
+            print("Enabling RDP for Windows 11...")
+            commands = [
+                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
+                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
+            ]
+
+            for cmd in commands:
+                subprocess.run(cmd, check=True)
+
+            print("RDP enabled successfully on Windows 11")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error enabling RDP on Windows 11: {e}")
+            raise
+
+class Windows10Setup:
+    @staticmethod
+    def install_openssh():
+        try:
+            # Check if OpenSSH is already installed
+            check_command = [
+                "powershell",
+                "-Command",
+                "Get-WindowsCapability -Online | Where-Object { $_.Name -like '*OpenSSH*' }"
+            ]
+
+            process = subprocess.run(check_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if "Installed" in process.stdout:
+                print("OpenSSH is already installed on Windows 10.")
+                return
+
+            # Install OpenSSH
+            print("Installing OpenSSH on Windows 10...")
+            install_command = [
+                "powershell",
+                "-Command",
+                "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+            ]
+            subprocess.run(install_command, check=True)
+
+            # Start and configure service
+            subprocess.run([
+                "powershell",
+                "-Command",
+                "Start-Service sshd; Set-Service -Name sshd -StartupType Automatic"
+            ], check=True)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install OpenSSH on Windows 10: {e}")
+            raise
+
+    @staticmethod
+    def enable_rdp():
+        try:
+            print("Enabling RDP for Windows 10...")
+            commands = [
+                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
+                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
+            ]
+
+            for cmd in commands:
+                subprocess.run(cmd, check=True)
+
+            print("RDP enabled successfully on Windows 10")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error enabling RDP on Windows 10: {e}")
+            raise
+
 class WindowsServer2016Setup:
     @staticmethod
     def install_openssh():
