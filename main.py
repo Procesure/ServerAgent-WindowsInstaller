@@ -157,10 +157,13 @@ class WindowsServer2016Setup:
     @staticmethod
     def install_openssh():
         try:
-            subprocess.run(
-                ["powershell", "mkdir c:\openssh-install"],
-                check=True
-            )
+            try:
+                subprocess.run(
+                    ["powershell", "mkdir c:/openssh-install"],
+                    check=True
+                )
+            except Exception as e:
+                print(e)
 
             # Run both the TLS setup and the download in the same PowerShell command
             subprocess.run(
@@ -255,7 +258,7 @@ def download_ngrok():
 
         # Download ngrok
         print("Downloading procesure agent...")
-        subprocess.run(["curl", "-Lo", ngrok_zip, ngrok_url], check=True)
+        subprocess.run(["curl", "-o", ngrok_zip, ngrok_url], check=True)
 
         # Extract ngrok
         subprocess.run(["tar", "-xf", ngrok_zip, "-C", ngrok_dir], check=True)
