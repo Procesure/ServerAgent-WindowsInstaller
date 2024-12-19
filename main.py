@@ -148,42 +148,31 @@ class WindowsServer2016Setup:
     @staticmethod
     def install_openssh():
         try:
-            # Set the required protocol for downloads (TLS 1.2)
-            subprocess.run(
-                ["powershell", "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12"],
-                check=True
-            )
-
-            # Create OpenSSH installation folder and download the OpenSSH zip
-            subprocess.run(
-                ["powershell", "mkdir c:\\openssh-install; cd c:\\openssh-install"],
-                check=True
-            )
+            # Run both the TLS setup and the download in the same PowerShell command
             subprocess.run(
                 [
                     "powershell",
-                    "Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' -OutFile .\\openssh.zip"
+                    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "  # Set TLS protocol
+                    "Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' -OutFile 'c:\\openssh-install\\openssh.zip'"
                 ],
                 check=True
             )
+
+            # Extract the downloaded OpenSSH zip
             subprocess.run(
-                ["powershell", "Expand-Archive .\\openssh.zip -DestinationPath .\\openssh\\"],
-                check=True
-            )
-            subprocess.run(
-                ["powershell", "cd .\\openssh\\OpenSSH-Win64\\"],
+                ["powershell", "Expand-Archive -Path 'c:\\openssh-install\\openssh.zip' -DestinationPath 'c:\\openssh-install\\openssh'"],
                 check=True
             )
 
-            # Add OpenSSH to PATH
+            # Add OpenSSH to the system PATH
             subprocess.run(
-                ["powershell", "setx PATH '$env:path;c:\\openssh-install\\openssh\\OpenSSH-Win64\\' -m"],
+                ["powershell", "setx PATH '$env:path;c:\\openssh-install\\openssh\\' -m"],
                 check=True
             )
 
-            # Install SSH service
+            # Install OpenSSH
             subprocess.run(
-                ["powershell", "powershell.exe -ExecutionPolicy Bypass -File install-sshd.ps1"],
+                ["powershell", "powershell.exe -ExecutionPolicy Bypass -File 'c:\\openssh-install\\openssh\\OpenSSH-Win64\\install-sshd.ps1'"],
                 check=True
             )
 
@@ -212,24 +201,6 @@ class WindowsServer2016Setup:
 
         except subprocess.CalledProcessError as e:
             print(f"Failed to install OpenSSH on Windows Server 2016: {e}")
-            raise
-
-    @staticmethod
-    def enable_rdp():
-        try:
-            print("Enabling RDP for Windows Server 2016...")
-            commands = [
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
-            ]
-
-            for cmd in commands:
-                subprocess.run(cmd, check=True)
-
-            print("RDP enabled successfully on Windows Server 2016")
-
-        except subprocess.CalledProcessError as e:
-            print(f"Error enabling RDP on Windows Server 2016: {e}")
             raise
 
 def download_ngrok():
