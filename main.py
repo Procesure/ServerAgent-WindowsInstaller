@@ -17,21 +17,13 @@ def check_admin_privileges():
 
 
 def download_and_install_open_ssh():
-
-    """
-    Installs OpenSSH server on Windows if it's not already installed.
-    This function uses PowerShell commands to ensure OpenSSH is available.
-
-    """
-
     try:
         # Check if OpenSSH is already installed
         check_command = [
             "powershell",
             "-Command",
-            "Get-WindowsCapability -Online | Where-Object { $_.Name -like '*OpenSSH*' }"
+            "dism /Online /Get-Capabilities | findstr OpenSSH"
         ]
-
         process = subprocess.run(
             check_command,
             stdout=subprocess.PIPE,
@@ -44,28 +36,28 @@ def download_and_install_open_ssh():
             return
 
         # Install OpenSSH client and server
-        print("OpenSSH not found. Installing OpenSSH client and server...")
+        print("Installing OpenSSH client and server...")
         install_command = [
             "powershell",
             "-Command",
-            "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+            "dism /Online /Add-Capability /CapabilityName:OpenSSH.Server~~~~0.0.1.0"
         ]
         subprocess.run(install_command, check=True)
 
         # Start and enable OpenSSH server service
         print("Starting and enabling OpenSSH server service...")
-        start_service_command = [
+        subprocess.run([
             "powershell",
             "-Command",
-            "Start-Service sshd; Set-Service -Name sshd -StartupType Automatic"
-        ]
-        subprocess.run(start_service_command, check=True)
+            "sc.exe config sshd start= auto && sc.exe start sshd"
+        ], check=True)
 
         print("OpenSSH installation and setup complete.")
     except subprocess.CalledProcessError as e:
         print(f"Failed to install or configure OpenSSH: {e}")
     except Exception as e:
         print(f"An unexpected error occurred during OpenSSH installation: {e}")
+
 
 
 def download_ngrok():
