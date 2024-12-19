@@ -4,6 +4,7 @@ import subprocess
 import platform
 from pathlib import Path
 
+
 def get_windows_version():
     """Detect Windows version and return version info."""
     try:
@@ -24,6 +25,7 @@ def get_windows_version():
         print(f"Error detecting Windows version: {e}")
         sys.exit(1)
 
+
 def check_admin_privileges():
     """Check if the script is running with administrator privileges."""
     try:
@@ -32,6 +34,7 @@ def check_admin_privileges():
     except Exception:
         print("Error checking admin privileges")
         return False
+
 
 class Windows11Setup:
     @staticmethod
@@ -76,8 +79,10 @@ class Windows11Setup:
         try:
             print("Enabling RDP for Windows 11...")
             commands = [
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
+                ["powershell", "-Command",
+                 "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
+                ["powershell", "-Command",
+                 "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
             ]
 
             for cmd in commands:
@@ -88,6 +93,7 @@ class Windows11Setup:
         except subprocess.CalledProcessError as e:
             print(f"Error enabling RDP on Windows 11: {e}")
             raise
+
 
 class Windows10Setup:
     @staticmethod
@@ -131,8 +137,10 @@ class Windows10Setup:
         try:
             print("Enabling RDP for Windows 10...")
             commands = [
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
-                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
+                ["powershell", "-Command",
+                 "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
+                ["powershell", "-Command",
+                 "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
             ]
 
             for cmd in commands:
@@ -143,6 +151,7 @@ class Windows10Setup:
         except subprocess.CalledProcessError as e:
             print(f"Error enabling RDP on Windows 10: {e}")
             raise
+
 
 class WindowsServer2016Setup:
     @staticmethod
@@ -160,7 +169,8 @@ class WindowsServer2016Setup:
 
             # Extract the downloaded OpenSSH zip
             subprocess.run(
-                ["powershell", "Expand-Archive -Path 'c:\\openssh-install\\openssh.zip' -DestinationPath 'c:\\openssh-install\\openssh'"],
+                ["powershell",
+                 "Expand-Archive -Path 'c:\\openssh-install\\openssh.zip' -DestinationPath 'c:\\openssh-install\\openssh'"],
                 check=True
             )
 
@@ -172,7 +182,8 @@ class WindowsServer2016Setup:
 
             # Install OpenSSH
             subprocess.run(
-                ["powershell", "powershell.exe -ExecutionPolicy Bypass -File 'c:\\openssh-install\\openssh\\OpenSSH-Win64\\install-sshd.ps1'"],
+                ["powershell",
+                 "powershell.exe -ExecutionPolicy Bypass -File 'c:\\openssh-install\\openssh\\OpenSSH-Win64\\install-sshd.ps1'"],
                 check=True
             )
 
@@ -204,6 +215,23 @@ class WindowsServer2016Setup:
 
         except subprocess.CalledProcessError as e:
             print(f"Failed to install OpenSSH on Windows Server 2016: {e}")
+            raise
+    @staticmethod
+    def enable_rdp():
+        try:
+            print("Enabling RDP for Windows Server 2016...")
+            commands = [
+                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0"],
+                ["powershell", "-Command", "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"]
+            ]
+
+            for cmd in commands:
+                subprocess.run(cmd, check=True)
+
+            print("RDP enabled successfully on Windows Server 2016")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error enabling RDP on Windows Server 2016: {e}")
             raise
 
 def download_ngrok():
@@ -239,6 +267,7 @@ def download_ngrok():
         print(f"Error downloading ngrok: {e}")
         sys.exit(1)
 
+
 def setup_ngrok_service(ngrok_path):
     """Set up ngrok as a Windows service using the specified configuration file."""
     try:
@@ -257,6 +286,7 @@ def setup_ngrok_service(ngrok_path):
     except Exception as e:
         print(f"Unexpected error: {e}")
         sys.exit(1)
+
 
 def main():
     if not check_admin_privileges():
@@ -295,6 +325,7 @@ def main():
     except Exception as e:
         print(f"Setup failed: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
