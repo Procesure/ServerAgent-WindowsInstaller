@@ -28,7 +28,7 @@ jobs:
 
     - name: Build Windows EXE
       run: |
-        pyinstaller --onefile --windowed --name agent main.py
+        pyinstaller procesure_agent.spec
 
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
