@@ -22,7 +22,7 @@ def main():
     app = QApplication(sys.argv)
     gui = ModernConfigGUI()
 
-    def start_installation(auth_token, ip_address, install_path):
+    def start_installation(auth_token, ip_address, install_path, ssh_keys_path):
         # Redirect stdout to the GUI log for installation process
         sys.stdout = gui.get_log_handler()
         
@@ -46,7 +46,7 @@ def main():
                 sys.exit(1)
 
             # Install OpenSSH
-            setup_class.install_openssh()
+            setup_class.install_openssh(ssh_keys_path)
 
             # Enable RDP
             setup_class.enable_rdp()
@@ -63,7 +63,7 @@ def main():
 
     # Connect the signal to start installation
     gui.config_ready.connect(lambda auth, ip, path: gui.start_installation_process(
-        lambda a, i, p: start_installation(a, i, p)
+        lambda a, i, p, ssh_path: start_installation(a, i, p, ssh_path)
     ))
     
     # Show the GUI

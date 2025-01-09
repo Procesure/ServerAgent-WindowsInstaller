@@ -1,10 +1,10 @@
 import subprocess
 import sys
+import os
 
 
 class Windows11Setup:
-    @staticmethod
-    def install_openssh():
+    def install_openssh(self, ssh_keys_path):
         try:
             # Check if OpenSSH is already installed
             check_command = [
@@ -70,8 +70,7 @@ class Windows11Setup:
 
 
 class Windows10Setup:
-    @staticmethod
-    def install_openssh():
+    def install_openssh(self, ssh_keys_path):
         try:
             # Check if OpenSSH is already installed
             check_command = [
@@ -139,11 +138,10 @@ class Windows10Setup:
 
 
 class WindowsServer2016Setup:
-    @staticmethod
-    def install_openssh():
+    def install_openssh(self, ssh_keys_path):
         try:
             try:
-                subprocess.run(["powershell", "mkdir c:/openssh-install"], check=True)
+                subprocess.run(["powershell", f"mkdir {self.openssh_path}"], check=True)
             except Exception as e:
                 print(e)
 
@@ -152,7 +150,7 @@ class WindowsServer2016Setup:
                 [
                     "powershell",
                     "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "  # Set TLS protocol
-                    "Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' -OutFile 'c:\\openssh-install\\openssh.zip'",
+                    f"Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' -OutFile '{self.openssh_path}\\openssh.zip'",
                 ],
                 check=True,
             )
@@ -161,7 +159,7 @@ class WindowsServer2016Setup:
             subprocess.run(
                 [
                     "powershell",
-                    "Expand-Archive -Path 'c:\\openssh-install\\openssh.zip' -DestinationPath 'c:\\openssh-install\\openssh'",
+                    f"Expand-Archive -Path '{self.openssh_path}\\openssh.zip' -DestinationPath '{self.openssh_path}\\openssh'",
                 ],
                 check=True,
             )
@@ -170,7 +168,7 @@ class WindowsServer2016Setup:
             subprocess.run(
                 [
                     "powershell",
-                    "setx PATH '$env:path;c:\\openssh-install\\openssh\\' -m",
+                    f"setx PATH '$env:path;{self.openssh_path}\\openssh\\' -m",
                 ],
                 check=True,
             )
@@ -179,7 +177,7 @@ class WindowsServer2016Setup:
             subprocess.run(
                 [
                     "powershell",
-                    "powershell.exe -ExecutionPolicy Bypass -File 'c:\\openssh-install\\openssh\\OpenSSH-Win64\\install-sshd.ps1'",
+                    f"powershell.exe -ExecutionPolicy Bypass -File '{self.openssh_path}\\openssh\\OpenSSH-Win64\\install-sshd.ps1'",
                 ],
                 check=True,
             )
@@ -234,4 +232,4 @@ class WindowsServer2016Setup:
 
         except subprocess.CalledProcessError as e:
             print(f"Error enabling RDP on Windows Server 2016: {e}")
-            raise 
+            raise

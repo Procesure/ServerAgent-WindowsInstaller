@@ -11,16 +11,17 @@ import sys
 class InstallationWorker(QThread):
     finished = pyqtSignal()
     
-    def __init__(self, install_function, auth_token, ip_address, install_path):
+    def __init__(self, install_function, auth_token, ip_address, install_path, ssh_keys_path):
         super().__init__()
         self.install_function = install_function
         self.auth_token = auth_token
         self.ip_address = ip_address
         self.install_path = install_path
+        self.ssh_keys_path = ssh_keys_path
 
     def run(self):
         try:
-            self.install_function(self.auth_token, self.ip_address, self.install_path)
+            self.install_function(self.auth_token, self.ip_address, self.install_path, self.ssh_keys_path)
             self.finished.emit()
         except Exception as e:
             print(f"Installation thread error: {e}")
@@ -55,20 +56,22 @@ class LogHandler(QObject):
 
 
 class ModernConfigGUI(QMainWindow):
-    config_ready = pyqtSignal(str, str, str)
+    config_ready = pyqtSignal(str, str, str, str)  # Updated to include ssh_keys_path
 
     def __init__(self):
         super().__init__()
         self.auth_token = None
         self.ip_address = None
         self.install_path = None
+        self.ssh_keys_path = None
         self.path_entry_clicked = False
+        self.ssh_path_entry_clicked = False
         self.log_handler = LogHandler()
         self.log_handler.log_signal.connect(self.update_log)
         self.installation_complete = False
         self.worker = None
         self.initUI()
-        
+
         # Start capturing logs immediately
         self.log_handler.start_capture()
         print("Procesure Agent Configuration Started")
@@ -80,7 +83,8 @@ class ModernConfigGUI(QMainWindow):
             install_function,
             self.auth_token,
             self.ip_address,
-            self.install_path
+            self.install_path,
+            self.ssh_keys_path
         )
         self.worker.finished.connect(self.on_installation_finished)
         self.worker.start()
@@ -97,7 +101,7 @@ class ModernConfigGUI(QMainWindow):
     def initUI(self):
         # Set window properties
         self.setWindowTitle('Procesure Agent Configuration')
-        self.setMinimumSize(600, 600)  # Set minimum size instead of fixed
+        self.setMinimumSize(600, 700)  # Increased height for new field
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #f0f0f0;
@@ -202,20 +206,40 @@ class ModernConfigGUI(QMainWindow):
         input_layout.addWidget(QLabel('Installation Path:'))
         path_layout = QHBoxLayout()
         path_layout.setSpacing(0)
-        
+
         self.path_entry = QLineEdit()
         self.path_entry.setFixedHeight(45)
         self.path_entry.setPlaceholderText('C:\Program Files\Procesure')
         self.path_entry.mousePressEvent = self.on_path_entry_click
         path_layout.addWidget(self.path_entry)
-        
+
         browse_btn = QPushButton('Browse')
         browse_btn.setObjectName('browse_btn')
         browse_btn.setFixedHeight(45)
         browse_btn.clicked.connect(self.browse_folder)
         path_layout.addWidget(browse_btn)
-        
+
         input_layout.addLayout(path_layout)
+
+        # SSH Keys Path with Browse Button
+        input_layout.addWidget(QLabel('SSH Authorized Keys Path:'))
+        ssh_path_layout = QHBoxLayout()
+        ssh_path_layout.setSpacing(0)
+
+        self.ssh_path_entry = QLineEdit()
+        self.ssh_path_entry.setFixedHeight(45)
+        self.ssh_path_entry.setPlaceholderText('C:\\Users\\username\\.ssh\\authorized_keys')
+        self.ssh_path_entry.mousePressEvent = self.on_ssh_path_entry_click
+        ssh_path_layout.addWidget(self.ssh_path_entry)
+
+        ssh_browse_btn = QPushButton('Browse')
+        ssh_browse_btn.setObjectName('browse_btn')
+        ssh_browse_btn.setFixedHeight(45)
+        ssh_browse_btn.clicked.connect(self.browse_ssh_folder)
+        ssh_path_layout.addWidget(ssh_browse_btn)
+
+        input_layout.addLayout(ssh_path_layout)
+
         layout.addWidget(input_container)
 
         # Add Installation Log
@@ -228,7 +252,7 @@ class ModernConfigGUI(QMainWindow):
         self.button_container = QWidget()
         button_layout = QHBoxLayout(self.button_container)
         button_layout.setContentsMargins(0, 20, 0, 0)
-        
+
         # Continue Button
         self.continue_btn = QPushButton('Continue')
         self.continue_btn.setFixedHeight(45)
@@ -241,7 +265,7 @@ class ModernConfigGUI(QMainWindow):
         self.close_btn.clicked.connect(self.close)
         self.close_btn.hide()
         button_layout.addWidget(self.close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-        
+
         layout.addWidget(self.button_container)
 
         # Center the window on screen
@@ -255,11 +279,11 @@ class ModernConfigGUI(QMainWindow):
         timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd hh:mm:ss")
         formatted_text = f"[{timestamp}] {text.strip()}"
         self.log_text.append(formatted_text)
-        
+
         # Scroll to the bottom
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-        
+
         # Check if installation is complete
         if "Setup complete" in text:
             self.installation_complete = True
@@ -270,6 +294,7 @@ class ModernConfigGUI(QMainWindow):
             self.auth_entry.setEnabled(True)
             self.ip_entry.setEnabled(True)
             self.path_entry.setEnabled(True)
+            self.ssh_path_entry.setEnabled(True)
         elif "Setup failed" in text:
             self.installation_complete = False
             self.continue_btn.setEnabled(True)
@@ -279,6 +304,7 @@ class ModernConfigGUI(QMainWindow):
             self.auth_entry.setEnabled(True)
             self.ip_entry.setEnabled(True)
             self.path_entry.setEnabled(True)
+            self.ssh_path_entry.setEnabled(True)
 
     def get_log_handler(self):
         return self.log_handler
@@ -289,10 +315,16 @@ class ModernConfigGUI(QMainWindow):
             self.path_entry_clicked = True
         QLineEdit.mousePressEvent(self.path_entry, event)
 
+    def on_ssh_path_entry_click(self, event):
+        if not self.ssh_path_entry_clicked:
+            self.ssh_path_entry.clear()
+            self.ssh_path_entry_clicked = True
+        QLineEdit.mousePressEvent(self.ssh_path_entry, event)
+
     def on_continue(self):
         self.auth_token = self.auth_entry.text()
         self.ip_address = self.ip_entry.text()
-        
+
         # Validate input
         if not self.auth_token or not self.ip_address:
             print("Error: Please fill in all required fields.")
@@ -302,21 +334,28 @@ class ModernConfigGUI(QMainWindow):
             self.install_path = r"C:\Program Files\Procesure"
         else:
             self.install_path = self.path_entry.text()
-        
+
+        if not self.ssh_path_entry.text():
+            self.ssh_keys_path = r"C:\Users\.ssh\authorized_keys"
+        else:
+            self.ssh_keys_path = self.ssh_path_entry.text()
+
         # Log the configuration (without showing sensitive data)
         print(f"Installation Path: {self.install_path}")
+        print(f"SSH Keys Path: {self.ssh_keys_path}")
         print("Starting installation process...")
-        
+
         # Disable input fields during installation
         self.auth_entry.setEnabled(False)
         self.ip_entry.setEnabled(False)
         self.path_entry.setEnabled(False)
-        
+        self.ssh_path_entry.setEnabled(False)
+
         self.continue_btn.setEnabled(False)
         self.continue_btn.setText("Installing...")
-        
+
         # Emit signal with configuration
-        self.config_ready.emit(self.auth_token, self.ip_address, self.install_path)
+        self.config_ready.emit(self.auth_token, self.ip_address, self.install_path, self.ssh_keys_path)
 
     def browse_folder(self):
         folder = QFileDialog.getExistingDirectory(
@@ -327,4 +366,15 @@ class ModernConfigGUI(QMainWindow):
         )
         if folder:
             self.path_entry.setText(folder)
-            self.path_entry_clicked = True 
+            self.path_entry_clicked = True
+
+    def browse_ssh_folder(self):
+        file_path = QFileDialog.getOpenFileName(
+            self,
+            "Select SSH Authorized Keys File",
+            self.ssh_path_entry.text(),
+            "All Files (*.*)"
+        )[0]
+        if file_path:
+            self.ssh_path_entry.setText(file_path)
+            self.ssh_path_entry_clicked = True
