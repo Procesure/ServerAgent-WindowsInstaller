@@ -12,56 +12,65 @@ from utils import (
 
 
 def main():
-    # Create GUI and get configuration
-    app = QApplication(sys.argv)
-    gui = ModernConfigGUI()
-    
-    # Redirect stdout to the GUI log
-    sys.stdout = gui.get_log_handler()
-    
     if not check_admin_privileges():
         print("This script requires administrator privileges. Please run as administrator.")
         sys.exit(1)
 
     windows_version = get_windows_version()
-    print(f"Detected Windows version: {windows_version}")
 
-    auth_token, ip_address, install_path = gui.get_config()
+    # Create GUI
+    app = QApplication(sys.argv)
+    gui = ModernConfigGUI()
 
-    if not auth_token or not ip_address:
-        print("Configuration cancelled or incomplete.")
-        sys.exit(1)
+    def start_installation(auth_token, ip_address, install_path):
+        # Redirect stdout to the GUI log for installation process
+        sys.stdout = gui.get_log_handler()
+        
+        print(f"Detected Windows version: {windows_version}")
+        print("Starting installation process...")
 
-    create_ngrok_config(authtoken=auth_token, ssh_domain=ip_address, install_path=install_path)
+        try:
+            # Create ngrok configuration
+            create_ngrok_config(authtoken=auth_token, ssh_domain=ip_address, install_path=install_path)
 
-    # Initialize the appropriate setup class based on Windows version
-    setup_classes = {
-        "Windows11": Windows11Setup,
-        "Windows10": Windows10Setup,
-        "WindowsServer2016": WindowsServer2016Setup,
-    }
+            # Initialize the appropriate setup class based on Windows version
+            setup_classes = {
+                "Windows11": Windows11Setup,
+                "Windows10": Windows10Setup,
+                "WindowsServer2016": WindowsServer2016Setup,
+            }
 
-    setup_class = setup_classes.get(windows_version)
-    if not setup_class:
-        print(f"Unsupported Windows version: {windows_version}")
-        sys.exit(1)
+            setup_class = setup_classes.get(windows_version)
+            if not setup_class:
+                print(f"Unsupported Windows version: {windows_version}")
+                sys.exit(1)
 
-    try:
-        # Install OpenSSH
-        setup_class.install_openssh()
+            # Install OpenSSH
+            setup_class.install_openssh()
 
-        # Enable RDP
-        setup_class.enable_rdp()
+            # Enable RDP
+            setup_class.enable_rdp()
 
-        # Download and setup ngrok
-        ngrok_path = download_ngrok(install_path)
-        setup_ngrok_service(ngrok_path)
+            # Download and setup ngrok
+            ngrok_path = download_ngrok(install_path)
+            setup_ngrok_service(ngrok_path)
 
-        print(f"Setup complete for {windows_version}. Ngrok is running as a service.")
+            print(f"Setup complete for {windows_version}. Ngrok is running as a service.")
 
-    except Exception as e:
-        print(f"Setup failed: {e}")
-        sys.exit(1)
+        except Exception as e:
+            print(f"Setup failed: {e}")
+            sys.exit(1)
+
+    # Connect the signal to start installation
+    gui.config_ready.connect(lambda auth, ip, path: gui.start_installation_process(
+        lambda a, i, p: start_installation(a, i, p)
+    ))
+    
+    # Show the GUI
+    gui.show()
+    
+    # Start the event loop
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

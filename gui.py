@@ -3,22 +3,60 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QFrame, QFileDialog,
     QHBoxLayout, QTextEdit
 )
-from PyQt6.QtCore import Qt, QObject, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QDateTime, QThread
 from PyQt6.QtGui import QFont, QPalette, QColor
+import sys
+
+
+class InstallationWorker(QThread):
+    finished = pyqtSignal()
+    
+    def __init__(self, install_function, auth_token, ip_address, install_path):
+        super().__init__()
+        self.install_function = install_function
+        self.auth_token = auth_token
+        self.ip_address = ip_address
+        self.install_path = install_path
+
+    def run(self):
+        try:
+            self.install_function(self.auth_token, self.ip_address, self.install_path)
+            self.finished.emit()
+        except Exception as e:
+            print(f"Installation thread error: {e}")
 
 
 class LogHandler(QObject):
     log_signal = pyqtSignal(str)
 
+    def __init__(self):
+        super().__init__()
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+
     def write(self, text):
         if text.strip():  # Only emit non-empty strings
+            # Write to original stdout for console debugging
+            self.original_stdout.write(text)
             self.log_signal.emit(text)
 
     def flush(self):
-        pass
+        self.original_stdout.flush()
+
+    def start_capture(self):
+        """Start capturing stdout and stderr"""
+        sys.stdout = self
+        sys.stderr = self
+
+    def stop_capture(self):
+        """Restore original stdout and stderr"""
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
 
 
 class ModernConfigGUI(QMainWindow):
+    config_ready = pyqtSignal(str, str, str)
+
     def __init__(self):
         super().__init__()
         self.auth_token = None
@@ -28,7 +66,33 @@ class ModernConfigGUI(QMainWindow):
         self.log_handler = LogHandler()
         self.log_handler.log_signal.connect(self.update_log)
         self.installation_complete = False
+        self.worker = None
         self.initUI()
+        
+        # Start capturing logs immediately
+        self.log_handler.start_capture()
+        print("Procesure Agent Configuration Started")
+        print("Please enter your configuration details and click Continue to begin installation.")
+
+    def start_installation_process(self, install_function):
+        """Start the installation process in a separate thread"""
+        self.worker = InstallationWorker(
+            install_function,
+            self.auth_token,
+            self.ip_address,
+            self.install_path
+        )
+        self.worker.finished.connect(self.on_installation_finished)
+        self.worker.start()
+
+    def on_installation_finished(self):
+        """Handle installation completion"""
+        self.worker = None
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        self.log_handler.stop_capture()
+        event.accept()
 
     def initUI(self):
         # Set window properties
@@ -187,7 +251,11 @@ class ModernConfigGUI(QMainWindow):
         self.move(x, y)
 
     def update_log(self, text):
-        self.log_text.append(text.strip())
+        # Add timestamp to log messages
+        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd hh:mm:ss")
+        formatted_text = f"[{timestamp}] {text.strip()}"
+        self.log_text.append(formatted_text)
+        
         # Scroll to the bottom
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
@@ -197,6 +265,7 @@ class ModernConfigGUI(QMainWindow):
             self.installation_complete = True
             self.continue_btn.hide()
             self.close_btn.show()
+            print("Installation completed successfully. You may now close the window.")
             # Enable all input fields
             self.auth_entry.setEnabled(True)
             self.ip_entry.setEnabled(True)
@@ -205,6 +274,7 @@ class ModernConfigGUI(QMainWindow):
             self.installation_complete = False
             self.continue_btn.setEnabled(True)
             self.continue_btn.setText("Continue")
+            print("Installation failed. Please check the logs above and try again.")
             # Enable all input fields
             self.auth_entry.setEnabled(True)
             self.ip_entry.setEnabled(True)
@@ -222,10 +292,20 @@ class ModernConfigGUI(QMainWindow):
     def on_continue(self):
         self.auth_token = self.auth_entry.text()
         self.ip_address = self.ip_entry.text()
+        
+        # Validate input
+        if not self.auth_token or not self.ip_address:
+            print("Error: Please fill in all required fields.")
+            return
+
         if not self.path_entry.text():
             self.install_path = r"C:\Program Files\Procesure"
         else:
             self.install_path = self.path_entry.text()
+        
+        # Log the configuration (without showing sensitive data)
+        print(f"Installation Path: {self.install_path}")
+        print("Starting installation process...")
         
         # Disable input fields during installation
         self.auth_entry.setEnabled(False)
@@ -234,12 +314,9 @@ class ModernConfigGUI(QMainWindow):
         
         self.continue_btn.setEnabled(False)
         self.continue_btn.setText("Installing...")
-        self.installation_started = True
-
-    def get_config(self):
-        self.show()
-        QApplication.instance().exec()
-        return self.auth_token, self.ip_address, self.install_path
+        
+        # Emit signal with configuration
+        self.config_ready.emit(self.auth_token, self.ip_address, self.install_path)
 
     def browse_folder(self):
         folder = QFileDialog.getExistingDirectory(
