@@ -137,4 +137,59 @@ def create_ngrok_config(authtoken, ssh_domain, install_path):
         raise
     except Exception as e:
         print(f"Unexpected error creating ngrok configuration: {e}")
-        raise 
+        raise
+
+
+def setup_rdp_loopback():
+    """
+    Configura o arquivo hosts e cria credenciais RDP automáticas para 127.0.0.2 procesure,
+    com usuário e senha padrão (user/password), localizando dinamicamente o caminho do arquivo hosts.
+    """
+    # Valores fixos
+    alias_ip = '127.0.0.2'
+    alias_nome = 'procesure'
+    alias_entry = f"{alias_ip} {alias_nome}"
+    usuario = 'user'
+    senha = 'password'
+
+    # Localiza dinamicamente o arquivo hosts
+    system_root = os.environ.get('SystemRoot', r'C:\Windows')
+    hosts_path = os.path.join(system_root, r'System32\drivers\etc\hosts')
+
+    # Verifica e atualiza o arquivo hosts
+    try:
+        alias_exists = False
+        if os.path.exists(hosts_path):
+            with open(hosts_path, 'r') as hosts_file:
+                alias_exists = alias_entry in hosts_file.read()
+
+        if alias_exists:
+            print(f"Alias '{alias_entry}' já existe no arquivo hosts.")
+        else:
+            # Adiciona o alias ao arquivo hosts
+            with open(hosts_path, 'a') as hosts_file:
+                hosts_file.write(f'\n{alias_entry}\n')
+            print(f"Alias '{alias_entry}' adicionado ao arquivo hosts com sucesso!")
+    except PermissionError:
+        print("Erro: Permissão negada. Execute o script como administrador.")
+        return
+    except Exception as e:
+        print(f"Erro ao verificar ou modificar o arquivo hosts: {e}")
+        return
+
+    # Verifica e cria credenciais RDP
+    try:
+        result = subprocess.run(
+            f'cmdkey /list', shell=True, capture_output=True, text=True
+        )
+        if f"TERMSRV/{alias_ip}" in result.stdout:
+            print(f"Credencial RDP para TERMSRV/{alias_ip} já existe.")
+        else:
+            # Cria credenciais para RDP automático
+            comando_rdp = f'cmdkey /generic:TERMSRV/{alias_ip} /user:{usuario} /pass:{senha}'
+            subprocess.run(comando_rdp, shell=True, check=True)
+            print(f"Credenciais RDP criadas com sucesso! (Usuário: {usuario}, Senha: {senha})")
+    except subprocess.CalledProcessError as e:
+        print(f"Erro ao criar credenciais RDP: {e}")
+    except Exception as e:
+        print(f"Erro inesperado ao verificar ou criar credenciais RDP: {e}")
