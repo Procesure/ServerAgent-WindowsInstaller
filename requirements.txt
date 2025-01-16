@@ -1,4 +1,4 @@
-PyQt6>=6.4.0
+PyQt5>=5.15.11
 requests>=2.28.0
 PyYAML>=6.0
 pyinstaller>=5.13.0

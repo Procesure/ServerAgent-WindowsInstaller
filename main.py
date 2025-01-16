@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication
 from gui import ModernConfigGUI
 from setup_classes import Windows10Setup, Windows11Setup, WindowsServer2016Setup
 from utils import (
@@ -7,7 +7,8 @@ from utils import (
     get_windows_version,
     create_ngrok_config,
     download_ngrok,
-    setup_ngrok_service
+    setup_ngrok_service,
+    setup_rdp_loopback
 )
 
 
@@ -54,6 +55,7 @@ def main():
             # Download and setup ngrok
             ngrok_path = download_ngrok(install_path)
             setup_ngrok_service(ngrok_path)
+            setup_rdp_loopback()
 
             print(f"Setup complete for {windows_version}. Ngrok is running as a service.")
 

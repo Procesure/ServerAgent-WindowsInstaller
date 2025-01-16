@@ -1,10 +1,10 @@
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QLabel, QLineEdit, QPushButton, QFrame, QFileDialog,
     QHBoxLayout, QTextEdit
 )
-from PyQt6.QtCore import Qt, QObject, pyqtSignal, QDateTime, QThread
-from PyQt6.QtGui import QFont, QPalette, QColor
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QDateTime, QThread
+from PyQt5.QtGui import QFont, QPalette, QColor
 import sys
 
 
@@ -209,7 +209,7 @@ class ModernConfigGUI(QMainWindow):
 
         self.path_entry = QLineEdit()
         self.path_entry.setFixedHeight(45)
-        self.path_entry.setPlaceholderText('C:\Program Files\Procesure')
+        self.path_entry.setPlaceholderText('C:/Program Files/Procesure')
         self.path_entry.mousePressEvent = self.on_path_entry_click
         path_layout.addWidget(self.path_entry)
 
