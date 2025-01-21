@@ -1,380 +1,269 @@
+from typing import Callable
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, 
-    QLabel, QLineEdit, QPushButton, QFrame, QFileDialog,
-    QHBoxLayout, QTextEdit
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QLineEdit,
+    QPushButton, QFileDialog, QTextEdit, QStackedWidget
 )
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, QDateTime, QThread
-from PyQt5.QtGui import QFont, QPalette, QColor
-import sys
+from PyQt5.QtCore import pyqtSignal, QThread, Qt
+
+from installers.models import *
 
 
 class InstallationWorker(QThread):
     finished = pyqtSignal()
-    
-    def __init__(self, install_function, auth_token, ip_address, install_path, ssh_keys_path):
-        super().__init__()
-        self.install_function = install_function
-        self.auth_token = auth_token
-        self.ip_address = ip_address
-        self.install_path = install_path
-        self.ssh_keys_path = ssh_keys_path
 
-    def run(self):
+    def __init__(
+        self,
+        config: InstallationConfig,
+        install_function: Callable[[InstallationConfig], None]
+    ) -> None:
+
+        super().__init__()
+        self.config = config
+        self.install_function = install_function
+
+    def run(self) -> None:
+
         try:
-            self.install_function(self.auth_token, self.ip_address, self.install_path, self.ssh_keys_path)
+            self.install_function(self.config)
             self.finished.emit()
         except Exception as e:
-            print(f"Installation thread error: {e}")
+            print(f"Installation error: {e}")
 
 
-class LogHandler(QObject):
-    log_signal = pyqtSignal(str)
+class MultiStepInstaller(QMainWindow):
 
-    def __init__(self):
+    def __init__(
+        self,
+        install_function: Callable[[InstallationConfig], None]
+    ) -> None:
+
         super().__init__()
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
 
-    def write(self, text):
-        if text.strip():  # Only emit non-empty strings
-            # Write to original stdout for console debugging
-            self.original_stdout.write(text)
-            self.log_signal.emit(text)
-
-    def flush(self):
-        self.original_stdout.flush()
-
-    def start_capture(self):
-        """Start capturing stdout and stderr"""
-        sys.stdout = self
-        sys.stderr = self
-
-    def stop_capture(self):
-        """Restore original stdout and stderr"""
-        sys.stdout = self.original_stdout
-        sys.stderr = self.original_stderr
-
-
-class ModernConfigGUI(QMainWindow):
-    config_ready = pyqtSignal(str, str, str, str)  # Updated to include ssh_keys_path
-
-    def __init__(self):
-        super().__init__()
-        self.auth_token = None
-        self.ip_address = None
-        self.install_path = None
-        self.ssh_keys_path = None
-        self.path_entry_clicked = False
-        self.ssh_path_entry_clicked = False
-        self.log_handler = LogHandler()
-        self.log_handler.log_signal.connect(self.update_log)
-        self.installation_complete = False
         self.worker = None
-        self.initUI()
+        self.steps: QStackedWidget = None
+        self.config: InstallationConfig = InstallationConfig()
+        self.log_output: QTextEdit = None
+        self.installation_root_dir: QLineEdit = None
+        self.tcp_token: QLineEdit = None
+        self.tcp_address: QLineEdit = None
+        self.ssh_public_key: QLineEdit = None
+        self.rdp_username: QLineEdit = None
+        self.rdp_password: QLineEdit = None
 
-        # Start capturing logs immediately
-        self.log_handler.start_capture()
-        print("Procesure Agent Configuration Started")
-        print("Please enter your configuration details and click Continue to begin installation.")
+        self.steps = QStackedWidget()
+        self.step1 = self.create_step1()
+        self.step2 = self.create_step2()
+        self.step3 = self.create_step3()
 
-    def start_installation_process(self, install_function):
-        """Start the installation process in a separate thread"""
-        self.worker = InstallationWorker(
-            install_function,
-            self.auth_token,
-            self.ip_address,
-            self.install_path,
-            self.ssh_keys_path
-        )
-        self.worker.finished.connect(self.on_installation_finished)
-        self.worker.start()
+        self.init_ui()
+        self.install_function = install_function
 
-    def on_installation_finished(self):
-        """Handle installation completion"""
-        self.worker = None
+    def init_ui(self) -> None:
 
-    def closeEvent(self, event):
-        """Handle window close event"""
-        self.log_handler.stop_capture()
-        event.accept()
+        self.setWindowTitle("Procesure Server Agent Installer")
+        self.setMinimumSize(600, 400)
 
-    def initUI(self):
-        # Set window properties
-        self.setWindowTitle('Procesure Agent Configuration')
-        self.setMinimumSize(600, 700)  # Increased height for new field
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f0f0f0;
+                background-color: #f7f9fb;
             }
             QLabel {
-                color: #2c3e50;
-                font-size: 13px;
+                color: #34495e;
+                font-size: 16px;
                 font-weight: bold;
-                margin-bottom: 2px;
+                margin-bottom: 10px;
             }
             QLineEdit {
-                padding: 12px;
-                border: 2px solid #bdc3c7;
-                border-radius: 5px;
+                padding: 8px;
+                border: 1px solid #bdc3c7;
+                border-radius: 4px;
                 background-color: white;
-                font-size: 13px;
-                margin-bottom: 15px;
-                min-height: 20px;
-                color: #2c3e50;
+                font-size: 14px;
+                margin-bottom: 10px;
             }
             QLineEdit::placeholder {
                 color: #95a5a6;
             }
-            QLineEdit:focus {
-                border: 2px solid #3498db;
-            }
             QPushButton {
                 background-color: #3498db;
                 color: white;
-                padding: 14px;
+                padding: 10px;
                 border: none;
-                border-radius: 5px;
-                font-weight: bold;
+                border-radius: 4px;
                 font-size: 14px;
-                min-width: 140px;
-            }
-            QPushButton#browse_btn {
-                min-width: 80px;
-                padding: 12px;
-                margin-left: 10px;
-                font-size: 12px;
+                font-weight: bold;
+                margin-top: 10px;
             }
             QPushButton:hover {
                 background-color: #2980b9;
             }
             QPushButton:pressed {
-                background-color: #2472a4;
+                background-color: #2471a3;
             }
             QTextEdit {
-                border: 2px solid #bdc3c7;
-                border-radius: 5px;
-                padding: 10px;
+                border: 1px solid #bdc3c7;
+                border-radius: 4px;
+                padding: 8px;
                 font-family: Consolas, monospace;
                 font-size: 12px;
                 color: #2c3e50;
                 background-color: white;
-                min-height: 150px;
             }
         """)
 
-        # Create central widget and layout
+        self.steps.addWidget(self.step1)
+        self.steps.addWidget(self.step2)
+        self.steps.addWidget(self.step3)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+
+        layout.addWidget(self.steps)
+
         central_widget = QWidget()
+        central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(50, 20, 50, 40)
-        layout.setSpacing(5)
 
-        # Title
-        title = QLabel('Procesure Agent Configuration')
-        title.setStyleSheet("""
-            font-size: 20px;
-            color: #2c3e50;
-            font-weight: bold;
-            margin-bottom: 30px;
-            padding: 10px 0;
-            border-bottom: 2px solid #e0e0e0;
-            min-height: 30px;
-        """)
-        layout.addWidget(title, alignment=Qt.AlignmentFlag.AlignTop)
+    def show_step(self, step_index: int) -> None:
+        self.steps.setCurrentIndex(step_index)
+        self.clear_error_messages()
 
-        # Input Fields Container
-        input_container = QWidget()
-        input_layout = QVBoxLayout(input_container)
-        input_layout.setContentsMargins(0, 0, 0, 0)
-        input_layout.setSpacing(5)
+    def validate_and_next(self) -> None:
+        current_step = self.steps.currentIndex()
+        try:
+            self.validate_current_step(current_step)
+            self.show_step(current_step + 1)
+        except ValueError as e:
+            self.log_output.append(f"Error: {e}")
 
-        # Auth Token
-        input_layout.addWidget(QLabel('Auth Token:'))
-        self.auth_entry = QLineEdit()
-        self.auth_entry.setFixedHeight(45)
-        self.auth_entry.setPlaceholderText('Enter your authentication token')
-        input_layout.addWidget(self.auth_entry)
+    def validate_current_step(self, step_index: int) -> None:
 
-        # IP Address
-        input_layout.addWidget(QLabel('IP Address:'))
-        self.ip_entry = QLineEdit()
-        self.ip_entry.setFixedHeight(45)
-        self.ip_entry.setPlaceholderText('Enter IP address')
-        input_layout.addWidget(self.ip_entry)
+        if step_index == 0:
 
-        # Install Path with Browse Button
-        input_layout.addWidget(QLabel('Installation Path:'))
-        path_layout = QHBoxLayout()
-        path_layout.setSpacing(0)
+            path = self.installation_root_dir.text().strip()
+            if not path:
+                raise ValueError("Installation path is required.")
 
-        self.path_entry = QLineEdit()
-        self.path_entry.setFixedHeight(45)
-        self.path_entry.setPlaceholderText('C:/Program Files/Procesure')
-        self.path_entry.mousePressEvent = self.on_path_entry_click
-        path_layout.addWidget(self.path_entry)
+            self.config.installation_root_dir = Path(path)
 
-        browse_btn = QPushButton('Browse')
-        browse_btn.setObjectName('browse_btn')
-        browse_btn.setFixedHeight(45)
-        browse_btn.clicked.connect(self.browse_folder)
-        path_layout.addWidget(browse_btn)
+        elif step_index == 1:
 
-        input_layout.addLayout(path_layout)
+            token = self.tcp_token.text().strip()
+            address = self.tcp_address.text().strip()
+            public_key = self.ssh_public_key.text().strip()
 
-        # SSH Keys Path with Browse Button
-        input_layout.addWidget(QLabel('SSH Authorized Keys Path:'))
-        ssh_path_layout = QHBoxLayout()
-        ssh_path_layout.setSpacing(0)
+            if not token or not address:
+                raise ValueError("Authentication token and TCP address are required.")
 
-        self.ssh_path_entry = QLineEdit()
-        self.ssh_path_entry.setFixedHeight(45)
-        self.ssh_path_entry.setPlaceholderText('C:\\Users\\username\\.ssh\\authorized_keys')
-        self.ssh_path_entry.mousePressEvent = self.on_ssh_path_entry_click
-        ssh_path_layout.addWidget(self.ssh_path_entry)
+            self.config.tcp.token = token
+            self.config.tcp.address = address
+            self.config.ssh.public_key = public_key
 
-        ssh_browse_btn = QPushButton('Browse')
-        ssh_browse_btn.setObjectName('browse_btn')
-        ssh_browse_btn.setFixedHeight(45)
-        ssh_browse_btn.clicked.connect(self.browse_ssh_folder)
-        ssh_path_layout.addWidget(ssh_browse_btn)
+        elif step_index == 2:
+            username = self.rdp_username.text().strip()
+            password = self.rdp_password.text().strip()
+            if not username or not password:
+                raise ValueError("Username and password are required.")
+            self.config.rdp.username = username
+            self.config.rdp.password = password
 
-        input_layout.addLayout(ssh_path_layout)
+    def clear_error_messages(self) -> None:
+        if self.log_output:
+            self.log_output.clear()
 
-        layout.addWidget(input_container)
+    def create_step1(self) -> QWidget:
 
-        # Add Installation Log
-        layout.addWidget(QLabel('Installation Progress:'))
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        layout.addWidget(self.log_text, 1)  # Give it a stretch factor of 1
+        step = QWidget()
+        layout = QVBoxLayout()
 
-        # Button container at the bottom
-        self.button_container = QWidget()
-        button_layout = QHBoxLayout(self.button_container)
-        button_layout.setContentsMargins(0, 20, 0, 0)
+        title = QLabel("Step 1: Select the installation path")
+        layout.addWidget(title)
 
-        # Continue Button
-        self.continue_btn = QPushButton('Continue')
-        self.continue_btn.setFixedHeight(45)
-        self.continue_btn.clicked.connect(self.on_continue)
-        button_layout.addWidget(self.continue_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.installation_root_dir = QLineEdit()
+        self.installation_root_dir.setPlaceholderText("Enter installation path or browse")
+        self.installation_root_dir.setText(str(self.config.installation_root_dir))
+        layout.addWidget(self.installation_root_dir)
 
-        # Close Button (hidden initially)
-        self.close_btn = QPushButton('Close')
-        self.close_btn.setFixedHeight(45)
-        self.close_btn.clicked.connect(self.close)
-        self.close_btn.hide()
-        button_layout.addWidget(self.close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        browse_btn = QPushButton("Browse")
+        browse_btn.clicked.connect(self.handle_browse_install_path)
+        layout.addWidget(browse_btn)
 
-        layout.addWidget(self.button_container)
+        next_btn = QPushButton("Next")
+        next_btn.clicked.connect(self.validate_and_next)
+        layout.addWidget(next_btn)
 
-        # Center the window on screen
-        screen = QApplication.primaryScreen().geometry()
-        x = (screen.width() - self.width()) // 2
-        y = (screen.height() - self.height()) // 2
-        self.move(x, y)
+        step.setLayout(layout)
+        return step
 
-    def update_log(self, text):
-        # Add timestamp to log messages
-        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd hh:mm:ss")
-        formatted_text = f"[{timestamp}] {text.strip()}"
-        self.log_text.append(formatted_text)
+    def create_step2(self) -> QWidget:
 
-        # Scroll to the bottom
-        scrollbar = self.log_text.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        step = QWidget()
+        layout = QVBoxLayout()
 
-        # Check if installation is complete
-        if "Setup complete" in text:
-            self.installation_complete = True
-            self.continue_btn.hide()
-            self.close_btn.show()
-            print("Installation completed successfully. You may now close the window.")
-            # Enable all input fields
-            self.auth_entry.setEnabled(True)
-            self.ip_entry.setEnabled(True)
-            self.path_entry.setEnabled(True)
-            self.ssh_path_entry.setEnabled(True)
-        elif "Setup failed" in text:
-            self.installation_complete = False
-            self.continue_btn.setEnabled(True)
-            self.continue_btn.setText("Continue")
-            print("Installation failed. Please check the logs above and try again.")
-            # Enable all input fields
-            self.auth_entry.setEnabled(True)
-            self.ip_entry.setEnabled(True)
-            self.path_entry.setEnabled(True)
-            self.ssh_path_entry.setEnabled(True)
+        title = QLabel("Step 2: Enter TCP Address Information")
+        layout.addWidget(title)
 
-    def get_log_handler(self):
-        return self.log_handler
+        self.tcp_address = QLineEdit()
+        self.tcp_address.setPlaceholderText("Enter TCP address")
+        layout.addWidget(self.tcp_address)
 
-    def on_path_entry_click(self, event):
-        if not self.path_entry_clicked:
-            self.path_entry.clear()
-            self.path_entry_clicked = True
-        QLineEdit.mousePressEvent(self.path_entry, event)
+        self.tcp_token = QLineEdit()
+        self.tcp_token.setPlaceholderText("Enter authentication token")
+        layout.addWidget(self.tcp_token)
 
-    def on_ssh_path_entry_click(self, event):
-        if not self.ssh_path_entry_clicked:
-            self.ssh_path_entry.clear()
-            self.ssh_path_entry_clicked = True
-        QLineEdit.mousePressEvent(self.ssh_path_entry, event)
+        self.ssh_public_key = QLineEdit()
+        self.ssh_public_key.setPlaceholderText("Paste public key")
+        layout.addWidget(self.ssh_public_key)
 
-    def on_continue(self):
-        self.auth_token = self.auth_entry.text()
-        self.ip_address = self.ip_entry.text()
+        next_btn = QPushButton("Next")
+        next_btn.clicked.connect(self.validate_and_next)
+        layout.addWidget(next_btn)
 
-        # Validate input
-        if not self.auth_token or not self.ip_address:
-            print("Error: Please fill in all required fields.")
-            return
+        step.setLayout(layout)
+        return step
 
-        if not self.path_entry.text():
-            self.install_path = r"C:\Program Files\Procesure"
-        else:
-            self.install_path = self.path_entry.text()
+    def create_step3(self) -> QWidget:
 
-        if not self.ssh_path_entry.text():
-            self.ssh_keys_path = r"C:\Users\.ssh\authorized_keys"
-        else:
-            self.ssh_keys_path = self.ssh_path_entry.text()
+        step = QWidget()
+        layout = QVBoxLayout()
 
-        # Log the configuration (without showing sensitive data)
-        print(f"Installation Path: {self.install_path}")
-        print(f"SSH Keys Path: {self.ssh_keys_path}")
-        print("Starting installation process...")
+        title = QLabel("Step 5: Enter Client Credentials")
+        layout.addWidget(title)
 
-        # Disable input fields during installation
-        self.auth_entry.setEnabled(False)
-        self.ip_entry.setEnabled(False)
-        self.path_entry.setEnabled(False)
-        self.ssh_path_entry.setEnabled(False)
+        description = QLabel(
+            "Note: The credentials entered here are stored securely as Windows credentials on this machine and are not transmitted externally.")
+        description.setWordWrap(True)  # Enable word wrapping for longer text
+        layout.addWidget(description)
 
-        self.continue_btn.setEnabled(False)
-        self.continue_btn.setText("Installing...")
+        self.rdp_username = QLineEdit()
+        self.rdp_username.setPlaceholderText("Enter username")
+        layout.addWidget(self.rdp_username)
 
-        # Emit signal with configuration
-        self.config_ready.emit(self.auth_token, self.ip_address, self.install_path, self.ssh_keys_path)
+        self.rdp_password = QLineEdit()
+        self.rdp_password.setPlaceholderText("Enter password")
+        self.rdp_password.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.rdp_password)
 
-    def browse_folder(self):
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Select Installation Directory",
-            self.path_entry.text(),
-            QFileDialog.Option.ShowDirsOnly
-        )
+        next_btn = QPushButton("Next")
+        next_btn.clicked.connect(self.validate_and_next)
+        layout.addWidget(next_btn)
+
+        step.setLayout(layout)
+        return step
+
+    def handle_browse_install_path(self) -> None:
+
+        folder = QFileDialog.getExistingDirectory(self, "Select Installation Path")
         if folder:
-            self.path_entry.setText(folder)
-            self.path_entry_clicked = True
+            self.installation_root_dir.setText(folder)
 
-    def browse_ssh_folder(self):
-        file_path = QFileDialog.getOpenFileName(
-            self,
-            "Select SSH Authorized Keys File",
-            self.ssh_path_entry.text(),
-            "All Files (*.*)"
-        )[0]
-        if file_path:
-            self.ssh_path_entry.setText(file_path)
-            self.ssh_path_entry_clicked = True
+    def start_installation(self) -> None:
+
+        self.log_output.append("Starting installation...")
+        self.worker = InstallationWorker(config=self.config, install_function=self.install_function)
+        self.worker.finished.connect(self.on_installation_finished)
+        self.worker.start()
+
+    def on_installation_finished(self) -> None:
+        self.log_output.append("Installation complete.")
