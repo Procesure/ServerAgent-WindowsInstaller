@@ -4,7 +4,7 @@ import shutil
 
 from pathlib import Path
 
-from managers.base.manager import BaseManager
+from managers.manager import BaseManager
 from .models import *
 
 
@@ -15,6 +15,7 @@ class RDPManager(BaseManager):
     alias_name: StrictStr = "procesure"
 
     def __init__(self, config: RDPConfig):
+
         super().__init__()
         self.config: RDPConfig = config
 
@@ -28,7 +29,7 @@ class RDPManager(BaseManager):
             "-Value ", "0"
         ]
 
-        result = self.execute_command(
+        self.execute_command(
             cmd,
             msg_in="Enabling RDP on the machine.",
             msg_out="RDP has been enabled",
@@ -38,13 +39,17 @@ class RDPManager(BaseManager):
     def create_windows_credentials(self):
 
         """Create Windows credentials in Credential Manager."""
+
         cmd = [
-            self.powershell,
             "-Command",
             f"cmdkey /generic:{self.alias_ip} /user:{self.config.username} /pass:{self.config.password}"
         ]
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print(f"Credentials created for {self.alias_name}-{self.alias_ip}.")
+
+        self.execute_command(
+            cmd,
+            msg_in="Creating Windows Credentials",
+            msg_out=f"Credentials created for {self.alias_name}-{self.alias_ip}."
+        )
 
     def update_hosts_file(self):
 
@@ -74,30 +79,33 @@ class RDPManager(BaseManager):
         """Adds the user to the Remote Desktop Users group."""
 
         cmd = [
-            self.powershell,
             "-Command",
             f"Add-LocalGroupMember -Group 'Remote Desktop Users' -Member '{self.config.username}'"
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print(f"User '{self.config.username}' added to the Remote Desktop Users group.")
+        self.execute_command(
+            cmd,
+            msg_in=f"Adding {self.config.username} to RDP users group.",
+            msg_out=f"User '{self.config.username}' added to RDP users group."
+        )
 
-    def copy_rdp_file(self):
+    def copy_rdp_config_file(self):
 
         """Copies an RDP configuration file to the specified directory."""
 
-        source_path = "start-rdp.rdp"
-        destination_path = os.path.join(self.script_directory, "Procesure.rdp")
+        source_path = "../../scripts/config.rdp"
+        destination_path = Path(self.program_data_path / "config.rdp")
+        shutil.copy(source_path, destination_path)
+        print(f"RDP configuration file copied to {destination_path}")
 
-        try:
-            # Ensure the directory exists
-            os.makedirs(self.script_directory, exist_ok=True)
+    def copy_start_rdp_file(self):
 
-            # Copy the file
-            shutil.copy(source_path, destination_path)
-            print(f"RDP configuration file copied to {destination_path}")
-        except Exception as e:
-            print(f"Failed to copy RDP file: {e}")
+        """Copies an RDP configuration file to the specified directory."""
+
+        source_path = "../../scripts/start-rdp.bat"
+        destination_path = Path(self.program_data_path / "start-rdp.bat")
+        shutil.copy(source_path, destination_path)
+        print(f"RDP configuration file copied to {destination_path}")
 
     def handle_installation(self):
 
