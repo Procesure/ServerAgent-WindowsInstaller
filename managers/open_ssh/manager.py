@@ -5,7 +5,8 @@ from pathlib import Path
 from .models import SSHConfig
 from typing import List, Union
 
-from managers.base.manager import BaseManager
+from managers.manager import BaseManager
+
 
 class OpenSSHManager(BaseManager, ABC):
 

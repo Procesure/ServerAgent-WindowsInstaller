@@ -1,4 +1,3 @@
-from typing import Union, Callable
 from managers.open_ssh.manager import WinServer2016OpenSSHManager
 from managers.procesure.manager import ProcesureManager
 from managers.rdp.manager import RDPManager
