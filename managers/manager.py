@@ -11,7 +11,10 @@ class BaseManager:
     program_files_path: Path = Path("C:\Program Files\Procesure")
 
     def __init__(self):
-        self._powershell: Path = Path("C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
+
+        self.program_data_path.mkdir(exist_ok=True)
+        self.program_files_path.mkdir(exist_ok=True)
+        self._powershell: Path = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
 
     @property
     def powershell(self) -> Path:
@@ -43,7 +46,7 @@ class BaseManager:
 
             print(msg_in)
 
-            command = [str(self.powershell), *kwargs["commands"]]
+            command = [f"{self.powershell} ", *cmd]
 
             result = subprocess.run(
                 command,

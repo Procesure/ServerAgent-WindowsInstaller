@@ -1,6 +1,6 @@
 import sys
 from typing import Union
-from gui import QApplication, MultiStepInstaller
+from gui.gui import QApplication, MultiStepInstaller
 
 from managers.open_ssh.manager import WinServer2016OpenSSHManager
 from managers.procesure.manager import ProcesureManager
@@ -17,6 +17,7 @@ class BaseInstaller:
         self.ssh_manager: Union[WinServer2016OpenSSHManager, None] = None
         self.procesure_manager: Union[ProcesureManager, None] = None
         self.rdp_manager: Union[RDPManager, None] = None
+
 
     @staticmethod
     def start(install_function: Callable[[InstallationConfig], None]):

@@ -5,7 +5,7 @@ import yaml
 from pathlib import Path
 import zipfile
 
-from managers.base.manager import BaseManager
+from managers.manager import BaseManager
 from .models import TCPConfig
 
 

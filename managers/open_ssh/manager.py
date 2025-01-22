@@ -8,7 +8,7 @@ from typing import List, Union
 from managers.manager import BaseManager
 
 
-class OpenSSHManager(BaseManager, ABC):
+class OpenSSHManager(BaseManager):
 
     program_data_ssh: Path = Path(BaseManager.program_data_path / "ssh")
 
@@ -75,13 +75,10 @@ class OpenSSHManager(BaseManager, ABC):
         self.configure_ssh_service()
 
 
-class WinServer2016OpenSSHManager(OpenSSHManager):
+class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
 
-    common_installation_paths: List[Path] = [
-        Path("C:\Program Files\OpenSSH-Win64"),
-        Path("C:\Windows\System32\OpenSSH"),
-        Path("C:\Program Files (x86)\OpenSSH"),
-    ]
+    open_ssh_program_files_path: Path = Path(OpenSSHManager.program_files_path / "OpenSSH-Win64")
+    open_ssh_program_data_path: Path = Path(OpenSSHManager.program_files_path / "ssh")
 
     def __init__(self, config: SSHConfig):
         super().__init__(config)
@@ -89,24 +86,16 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
     def check_if_installed(self) -> bool:
 
-        sshd_path = self.search_openssh()
-        is_installed = sshd_path is not None
-        print("OpenSSH is already installed." if is_installed else "OpenSSH not found in the system.")
-        return is_installed
+        sshd_path = self.open_ssh_program_files_path / "sshd.exe"
 
-    def search_openssh(self) -> Union[Path, None]:
+        if sshd_path.exists():
+            print("OpenSSH is already installed.")
+            return True
+        return False
 
-        for path in self.common_installation_paths:
-            sshd_path = path / "sshd.exe"
-            if sshd_path.exists():
-                self.config.open_ssh_installation_path = path
-                return sshd_path
+    def download(self):
 
-        return None
-
-    def install(self):
-
-        commands = [
+        cmd = [
             "-Command",
             f"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
             f"Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' "
@@ -116,7 +105,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
         ]
 
         self.execute_command(
-            commands,
+            cmd,
             msg_in="Starting OpenSSH installation...",
             msg_out="OpenSSH has been installed.",
             msg_error="Failed to install OpenSSH."
@@ -124,13 +113,13 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
     def add_open_ssh_to_path(self):
 
-        commands = [
+        cmd = [
             "-Command",
-            f"[Environment]::SetEnvironmentVariable('PATH', $env:PATH + ';{self.program_files_path / 'OpenSSH-Win64'}', 'Machine')"
+            f"[Environment]::SetEnvironmentVariable('PATH', $env:PATH + ';{self.open_ssh_program_files_path}', 'Machine')"
         ]
 
         self.execute_command(
-            commands,
+            cmd,
             msg_in="Adding OpenSSH to PATH...",
             msg_out="OpenSSH path added to PATH.",
             msg_error="Failed to add OpenSSH to PATH."
@@ -138,54 +127,77 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
     def setup_ssh_program_data(self):
 
-        self.program_data_ssh.mkdir(parents=True, exist_ok=True)
-        sshd_config_path = self.program_data_ssh / "sshd_config"
-        default_config_path = self.program_files_path / "OpenSSH-Win64" / "sshd_config_default"
+        self.open_ssh_program_data_path.mkdir(parents=True, exist_ok=True)
+        sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
+        default_config_path = self.open_ssh_program_files_path / "sshd_config_default"
 
         if not sshd_config_path.exists() and default_config_path.exists():
             shutil.copy(default_config_path, sshd_config_path)
             print(f"Moved {default_config_path} to {sshd_config_path}")
 
-    def configure_ssh_service(self):
+    def install_sshd(self):
 
-        """Install and start the OpenSSH service."""
+        """Install the sshd service using the OpenSSH provided PowerShell script."""
 
-        install_script = self.config.open_ssh_installation_path / "install-sshd.ps1"
+        install_script = self.open_ssh_program_files_path / "install-sshd.ps1"
 
         self.execute_command(
             [
                 "-ExecutionPolicy", "Bypass",
-                "-File", str(install_script),
+                "-File", str(install_script)
             ],
-            msg_in=f"Executing install-sshd.ps1 from {install_script}...",
-            cwd=str(self.config.open_ssh_installation_path),
-            env={**os.environ, "PATH": f"{os.environ['PATH']};C:\\Windows\\System32"},
+            msg_in=f"Installing sshd service from {install_script}...",
+            msg_out="sshd service installed successfully."
         )
 
         self.fix_host_file_permissions()
 
-        self.execute_command(
-            ["-Command", "net start sshd"],
-            msg_in="Starting sshd service...",
-            env={**os.environ, "PATH": f"{os.environ['PATH']};C:\\Windows\\System32"}
-        )
+    def configure_ssh_service(self):
+
+        """Configure the sshd service to use the custom sshd_config file and ensure it starts automatically."""
+
+        sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
+        sshd_exe = self.open_ssh_program_files_path / "OpenSSH-Win64" / "sshd.exe"
+
+        # Update the service to start with the custom configuration file
 
         self.execute_command(
-            ["-Command", "Set-Service -Name sshd -StartupType Automatic"],
-            msg_in="Configuring sshd to start automatically...",
-            msg_out="SSHD service configured successfully."
+            [
+                "-Command",
+                f"sc.exe config sshd binPath= '\"{sshd_exe} -f {sshd_config_path}\"' start= auto"
+            ],
+            msg_in="Configuring sshd service to use custom config...",
+            msg_out="sshd service configured to use custom configuration."
         )
 
+    def restart_sshd_service(self):
+
+        """Restart the sshd service to apply new configurations."""
+
+        self.execute_command(
+            [
+                "-Command",
+                "Restart-Service -Name sshd -Force"
+            ],
+            msg_in="Restarting sshd service...",
+            msg_out="sshd service restarted successfully.",
+            msg_error="Failed to restart sshd service."
+        )
 
     def configure_firewall(self):
 
-        commands = [
-            "-Command",
-            "New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22"
+        cmd = [
+            "-Command ", "New-NetFirewallRule ",
+            "-Name ", "sshd ",
+            "-DisplayName ", "OpenSSH Server (sshd) ",
+            "-Enabled ", "True ",
+            "-Direction Inbound ", "-Protocol TCP ",
+            "-Action ", "Allow ",
+            "-LocalPort ", "2222"
         ]
 
         self.execute_command(
-            commands,
+            cmd,
             msg_in="Configuring firewall for SSHD...",
             msg_out="Firewall configured for SSHD.",
             msg_error="Failed to configure firewall for SSHD."
@@ -228,7 +240,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
     def fix_host_file_permissions(self):
 
-        fix_host_permissions_path = self.config.open_ssh_installation_path / "FixHostFilePermissions.ps1"
+        fix_host_permissions_path = self.open_ssh_program_files_path / "FixHostFilePermissions.ps1"
 
         self.execute_command(
             [
@@ -247,16 +259,14 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
         try:
 
-            sshd_config_path = self.program_data_ssh / "sshd_config"
+            sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
 
-            # Ensure sshd_config exists, or create a default one
             if not sshd_config_path.exists():
                 print(f"sshd_config not found at {sshd_config_path}, creating a new one...")
                 sshd_config_path.parent.mkdir(parents=True, exist_ok=True)
                 with sshd_config_path.open("w") as f:
                     f.write("# Default sshd_config generated by installer\n")
 
-            # Backup the current sshd_config
             sshd_config_backup = sshd_config_path.with_suffix(".bak")
             if not sshd_config_backup.exists():
                 sshd_config_backup.write_text(sshd_config_path.read_text())
@@ -264,7 +274,6 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
             else:
                 print(f"Backup already exists at {sshd_config_backup}, skipping backup.")
 
-            # Read the current sshd_config
             with sshd_config_path.open("r") as f:
                 config_lines = f.readlines()
 
@@ -308,15 +317,16 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
     def handle_installation(self):
 
         if not self.check_if_installed():
-            self.install()
+            self.download()
 
         self.add_open_ssh_to_path()
         self.setup_ssh_program_data()
         self.configure_firewall()
         self.configure_authorized_keys()
         self.update_sshd_config()
+        self.install_sshd()
         self.configure_ssh_service()
-
+        self.restart_sshd_service()
 
 
     

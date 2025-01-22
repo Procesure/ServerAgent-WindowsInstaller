@@ -50,11 +50,13 @@ class MultiStepInstaller(QMainWindow):
 
         self.step1 = self.create_step1()
         self.step2 = self.create_step2()
+        self.step3 = self.create_step3()
 
         self.init_ui()
         self.install_function = install_function
 
     def init_ui(self) -> None:
+
         self.setWindowTitle("Procesure Server Agent Installer")
         self.setMinimumSize(600, 400)
         self.setup_stylesheet()
@@ -149,7 +151,8 @@ class MultiStepInstaller(QMainWindow):
 
     def show_step(self, step_index: int) -> None:
         self.steps.setCurrentIndex(step_index)
-        self.log_output.clear()
+        if step_index == 2:
+            self.start_installation()
 
     def create_step1(self) -> QWidget:
         step = QWidget()
@@ -166,24 +169,52 @@ class MultiStepInstaller(QMainWindow):
         return step
 
     def create_step2(self) -> QWidget:
+
         step = QWidget()
         layout = QVBoxLayout()
+
         layout.addWidget(QLabel("Step 2: Enter Client Credentials"))
         layout.addWidget(QLabel("Note: The credentials entered here are stored securely as Windows credentials on this machine and are not transmitted externally.", wordWrap=True))
+
         layout.addWidget(self.rdp_username)
         self.rdp_username.setPlaceholderText("Enter username")
+
         layout.addWidget(self.rdp_password)
         self.rdp_password.setPlaceholderText("Enter password")
         self.rdp_password.setEchoMode(QLineEdit.Password)
+
         layout.addWidget(QPushButton("Install", clicked=self.validate_and_next))
         step.setLayout(layout)
+
+        return step
+
+    def create_step3(self):
+
+        step = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Installation Progress"))
+
+        self.finish_button = QPushButton("Finish Installation", clicked=self.finish_installation)
+        self.finish_button.setEnabled(False)  # Disable until installation is complete
+
+        layout.addWidget(self.finish_button)
+        step.setLayout(layout)
+
         return step
 
     def start_installation(self) -> None:
+
         self.log_output.append("Starting installation...")
         self.worker = InstallationWorker(config=self.config, install_function=self.install_function)
         self.worker.finished.connect(self.on_installation_finished)
         self.worker.start()
 
-    def on_installation_finished(self, message: str) -> None:
+    def on_installation_finished(self, message: str, success: bool):
+
         self.log_output.append(message)
+
+        if success:
+            self.finish_button.setEnabled(True)
+
+    def finish_installation(self):
+        self.close()
