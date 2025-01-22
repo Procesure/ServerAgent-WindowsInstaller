@@ -132,20 +132,28 @@ class MultiStepInstaller(QMainWindow):
             self.log_output.append(f"Error: {e}")
 
     def validate_current_step(self, step_index: int) -> None:
+
         if step_index == 0:
             token = self.tcp_token.text().strip()
             address = self.tcp_address.text().strip()
             public_key = self.ssh_public_key.text().strip()
+
             if not token or not address:
                 raise ValueError("Authentication token and TCP address are required.")
+
             self.config.tcp.token = token
             self.config.tcp.address = address
             self.config.ssh.public_key = public_key
+
         elif step_index == 1:
+
             username = self.rdp_username.text().strip()
             password = self.rdp_password.text().strip()
+
             if not username or not password:
                 raise ValueError("Username and password are required.")
+
+            self.config.ssh.username = username
             self.config.rdp.username = username
             self.config.rdp.password = password
 
@@ -155,6 +163,7 @@ class MultiStepInstaller(QMainWindow):
             self.start_installation()
 
     def create_step1(self) -> QWidget:
+
         step = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Step 1: Enter TCP Address Information"))
