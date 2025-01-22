@@ -1,17 +1,24 @@
 import os
-import subprocess
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
-from .models import SSHConfig, StrictStr
-from typing import List
+from .models import SSHConfig
+from typing import List, Union
 
+from managers.base.manager import BaseManager
 
-class OpenSSHManager(ABC):
+class OpenSSHManager(BaseManager, ABC):
 
-    program_data_ssh: Path = Path("C:\ProgramData\ssh")
-    powershell: StrictStr = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    program_data_ssh: Path = Path(BaseManager.program_data_path / "ssh")
+
+    common_installation_paths = [
+        Path(r"C:\Program Files\OpenSSH-Win64"),
+        Path(r"C:\Windows\System32\OpenSSH"),
+        Path(r"C:\Program Files (x86)\OpenSSH"),
+    ]
 
     def __init__(self, config: SSHConfig):
+        super().__init__()
         self.config = config
 
     @abstractmethod
@@ -77,256 +84,111 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
     def __init__(self, config: SSHConfig):
         super().__init__(config)
-
-    def search_openssh(self) -> Path | None:
-
-        """Search for OpenSSH in common installation locations."""
-
-        for path in self.common_installation_paths:
-
-            sshd_path = os.path.join(path, "sshd.exe")
-            if os.path.exists(sshd_path):
-                return Path(sshd_path)
-
-        return None
+        self.config = config
 
     def check_if_installed(self) -> bool:
 
-        """Check if OpenSSH is already installed."""
-
-        is_installed = bool(self.search_openssh())
-
-        if is_installed:
-            print("OpenSSH is already installed.")
-        else:
-            print("OpenSSH not found in the system.")
-
+        sshd_path = self.search_openssh()
+        is_installed = sshd_path is not None
+        print("OpenSSH is already installed." if is_installed else "OpenSSH not found in the system.")
         return is_installed
+
+    def search_openssh(self) -> Union[Path, None]:
+
+        for path in self.common_installation_paths:
+            sshd_path = path / "sshd.exe"
+            if sshd_path.exists():
+                self.config.open_ssh_installation_path = path
+                return sshd_path
+
+        return None
 
     def install(self):
 
-        """Install OpenSSH if it is not already installed."""
+        commands = [
+            "-Command",
+            f"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
+            f"Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' "
+            f"-OutFile '{self.program_files_path / 'openssh.zip'}'; "
+            f"Expand-Archive -Path '{self.program_files_path / 'openssh.zip'}' -DestinationPath '{self.program_files_path}'; "
+            f"Remove-Item -Path '{self.program_files_path / 'openssh.zip'}'"
+        ]
 
-        print("Installing OpenSSH...")
-
-        try:
-
-            self.config.open_ssh_installation_path = self.config.open_ssh_installation_path
-            self.config.open_ssh_installation_path.mkdir(parents=True, exist_ok=True)
-
-            # Download OpenSSH
-            subprocess.run(
-                [
-                    self.powershell,
-                    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
-                    f"Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/V8.6.0.0p1-Beta/OpenSSH-Win64.zip' "
-                    f"-OutFile '{self.config.open_ssh_installation_path / 'openssh.zip'}'",
-                ],
-                check=True,
-            )
-
-            # Extract OpenSSH
-            subprocess.run(
-                [
-                    self.powershell,
-                    f"Expand-Archive -Path '{self.config.open_ssh_installation_path / 'openssh.zip'}' -DestinationPath '{self.config.open_ssh_installation_path}'",
-                ],
-                check=True,
-            )
-
-            # Delete the ZIP file after extraction
-            zip_file_path = self.config.open_ssh_installation_path / "openssh.zip"
-            if zip_file_path.exists():
-                zip_file_path.unlink()
-
-            self.add_open_ssh_to_path()
-            print("OpenSSH installation completed.")
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to install OpenSSH: {e}")
-            raise
+        self.execute_command(
+            commands,
+            msg_in="Starting OpenSSH installation...",
+            msg_out="OpenSSH has been installed.",
+            msg_error="Failed to install OpenSSH."
+        )
 
     def add_open_ssh_to_path(self):
 
-        """Add OpenSSH installation path to the system PATH."""
+        commands = [
+            "-Command",
+            f"[Environment]::SetEnvironmentVariable('PATH', $env:PATH + ';{self.program_files_path / 'OpenSSH-Win64'}', 'Machine')"
+        ]
 
-        try:
-
-            subprocess.run(
-                [
-                    self.powershell,
-                    f"[System.Environment]::SetEnvironmentVariable('PATH', $env:PATH + ';{self.config.open_ssh_installation_path}', 'Machine')"
-                ],
-                check=True,
-            )
-            print("OpenSSH installation path added to PATH using PowerShell.")
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to add OpenSSH to PATH: {e}")
-            raise
+        self.execute_command(
+            commands,
+            msg_in="Adding OpenSSH to PATH...",
+            msg_out="OpenSSH path added to PATH.",
+            msg_error="Failed to add OpenSSH to PATH."
+        )
 
     def setup_ssh_program_data(self):
 
-        """Ensure the ProgramData\ssh folder exists and contains required files."""
-
         self.program_data_ssh.mkdir(parents=True, exist_ok=True)
-
         sshd_config_path = self.program_data_ssh / "sshd_config"
+        default_config_path = self.program_files_path / "OpenSSH-Win64" / "sshd_config_default"
 
-        if not sshd_config_path.exists():
-
-            default_config_path = self.config.open_ssh_installation_path / "sshd_config_default"
-
-            if default_config_path.exists():
-
-                default_config_path.rename(sshd_config_path)
-                print(f"Moved {default_config_path} to {sshd_config_path}")
-
-            else:
-
-                print("Default sshd_config not found. Creating a new one...")
-                with sshd_config_path.open("w") as f:
-                    f.write("# Default sshd_config generated by installer\n")
-
-        self.create_host_keys()
-
-    def create_host_keys(self):
-
-        print("Generating all missing host keys...")
-
-        try:
-            subprocess.run(
-                [
-                    self.config.open_ssh_installation_path / "ssh-keygen.exe",
-                    "-A",
-                ],
-                check=True,
-            )
-            print("Host keys generated successfully.")
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to generate host keys: {e}")
-            raise
+        if not sshd_config_path.exists() and default_config_path.exists():
+            shutil.copy(default_config_path, sshd_config_path)
+            print(f"Moved {default_config_path} to {sshd_config_path}")
 
     def configure_ssh_service(self):
 
         """Install and start the OpenSSH service."""
 
-        try:
+        install_script = self.config.open_ssh_installation_path / "install-sshd.ps1"
 
-            install_script = self.config.open_ssh_installation_path / "install-sshd.ps1"
+        self.execute_command(
+            [
+                "-ExecutionPolicy", "Bypass",
+                "-File", str(install_script),
+            ],
+            msg_in=f"Executing install-sshd.ps1 from {install_script}...",
+            cwd=str(self.config.open_ssh_installation_path),
+            env={**os.environ, "PATH": f"{os.environ['PATH']};C:\\Windows\\System32"},
+        )
 
-            print(f"Executing install-sshd.ps1 from {install_script}...")
+        self.fix_host_file_permissions()
 
-            result = subprocess.run(
-                [
-                    self.powershell,
-                    "-ExecutionPolicy", "Bypass",
-                    "-File", str(install_script),
-                ],
-                check=True,
-                text=True,
-                capture_output=True,
-                cwd=str(self.config.open_ssh_installation_path),  # Set working directory
-                env={**os.environ, "PATH": f"{os.environ['PATH']};C:\\Windows\\System32"},
-            )
-            print(f"Script Output: {result.stdout}")
-            print(f"Script Errors: {result.stderr}")
+        self.execute_command(
+            ["-Command", "net start sshd"],
+            msg_in="Starting sshd service...",
+            env={**os.environ, "PATH": f"{os.environ['PATH']};C:\\Windows\\System32"}
+        )
 
-            self.fix_host_file_permissions()
+        self.execute_command(
+            ["-Command", "Set-Service -Name sshd -StartupType Automatic"],
+            msg_in="Configuring sshd to start automatically...",
+            msg_out="SSHD service configured successfully."
+        )
 
-            # Start the sshd service
-            print("Starting sshd service...")
-
-            result = subprocess.run(
-                [self.powershell, "-Command", "net start sshd"],
-                env={**os.environ, "PATH": f"{os.environ['PATH']};C:\\Windows\\System32"},
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=False
-            )
-
-            print("Command:", result.args)
-            print("Exit Code:", result.returncode)
-            print("Output:", result.stdout)
-            print("Error:", result.stderr)
-
-            # Set sshd service to start automatically
-            print("Configuring sshd to start automatically...")
-
-            subprocess.run(
-                [self.powershell, "-Command", "Set-Service -Name sshd -StartupType Automatic"],
-                check=True,
-            )
-
-            print("SSHD service configured successfully.")
-
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to configure SSH service. Command: {e.cmd}\nExit Code: {e.returncode}")
-            print(f"Output: {e.stdout}\nError: {e.stderr}")
-            raise
-        except Exception as e:
-            print(f"Unexpected error configuring SSH service: {e}")
-            raise
-
-    def fix_host_file_permissions(self):
-
-        fix_host_permissions_path = self.config.open_ssh_installation_path / "FixHostFilePermissions.ps1"
-
-        try:
-
-            subprocess.run(
-                [
-                    self.powershell,
-                    "-NoProfile",
-                    "-ExecutionPolicy", "Bypass",
-                    "-Command",
-                    f"& '{fix_host_permissions_path}' -Confirm:$false"
-                ],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-
-            print("FixHostFilePermissions script executed successfully without prompting.")
-
-        except subprocess.CalledProcessError as e:
-            print(f"An error occurred: {e.stderr}")
-        except Exception as e:
-            print(f"Unexpected error: {e}")
 
     def configure_firewall(self):
 
-        """Allow inbound SSH traffic through the firewall."""
+        commands = [
+            "-Command",
+            "New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22"
+        ]
 
-        try:
-
-            # Remove the existing rule if it exists
-            subprocess.run(
-                [
-                    self.powershell,
-                    "if (Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue) { Remove-NetFirewallRule -Name sshd }"
-                ],
-                check=True,
-            )
-
-            print("Existing 'sshd' firewall rule removed.")
-
-            # Add the firewall rule
-            subprocess.run(
-                [
-                    self.powershell,
-                    "New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22",
-                ],
-                check=True,
-            )
-
-            print("Firewall rule 'sshd' created successfully.")
-
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to configure firewall for SSH. Error: {e.stderr}")
-            raise
-        except Exception as e:
-            print(f"Unexpected error configuring firewall: {e}")
-            raise
+        self.execute_command(
+            commands,
+            msg_in="Configuring firewall for SSHD...",
+            msg_out="Firewall configured for SSHD.",
+            msg_error="Failed to configure firewall for SSHD."
+        )
 
     def configure_authorized_keys(self):
 
@@ -347,22 +209,36 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
                 if self.config.public_key not in existing_keys:
                     f.write(f"{self.config.public_key}\n")
 
-            # Set permissions for the folder and file (optional)
-            subprocess.run(
+            self.execute_command(
                 [
                     "icacls",
                     str(user_ssh_path),
                     "/inheritance:r",
                     "/grant:r",
                     f"{self.config.username}:F",
-                ],
-                check=True,
+                ]
             )
 
             print(f"Configured authorized_keys for {self.config.username}.")
+
         except Exception as e:
             print(f"Failed to configure authorized_keys for {self.config.username}: {e}")
             raise
+
+    def fix_host_file_permissions(self):
+
+        fix_host_permissions_path = self.config.open_ssh_installation_path / "FixHostFilePermissions.ps1"
+
+        self.execute_command(
+            [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                f"& '{fix_host_permissions_path}' -Confirm:$false"
+            ],
+            msg_in="Fixing host files permission",
+            msg_out="FixHostFilePermissions script executed successfully"
+        )
 
     def update_sshd_config(self):
 
@@ -426,6 +302,19 @@ class WinServer2016OpenSSHManager(OpenSSHManager):
 
         except Exception as e:
             print(f"Failed to update sshd_config for {self.config.username}: {e}")
+
+
+    def handle_installation(self):
+
+        if not self.check_if_installed():
+            self.install()
+
+        self.add_open_ssh_to_path()
+        self.setup_ssh_program_data()
+        self.configure_firewall()
+        self.configure_authorized_keys()
+        self.update_sshd_config()
+        self.configure_ssh_service()
 
 
 
