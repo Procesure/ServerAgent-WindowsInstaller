@@ -60,7 +60,9 @@ class BaseManager:
             print("Command:", result.args)
             print("Exit Code:", result.returncode)
             print("Output:", result.stdout)
-            print("Error:", result.stderr)
+
+            if result.stderr:
+                print("Error:", result.stderr)
 
             print(msg_out)
 

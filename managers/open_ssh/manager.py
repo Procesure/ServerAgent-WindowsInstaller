@@ -135,6 +135,43 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
             shutil.copy(default_config_path, sshd_config_path)
             print(f"Moved {default_config_path} to {sshd_config_path}")
 
+    def update_fix_host_permissions_script(self):
+
+        # Define the search and replace strings
+        file_path = Path(self.open_ssh_program_files_path / "FixHostFilePermissions.ps1")
+
+        search_string = r'ProgramData\ssh'
+        replace_string = r'ProgramData\Procesure\ssh'
+
+        # Check if the file exists
+        if not os.path.isfile(file_path):
+            print(f"Error: The file {file_path} does not exist.")
+            return
+
+        # Read the contents of the file
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                contents = file.read()
+        except Exception as e:
+            print(f"Failed to read the file: {e}")
+            return
+
+        # Replace the target string
+        modified_contents = contents.replace(search_string, replace_string)
+
+        # Check if changes were made
+        if contents == modified_contents:
+            print("No changes were necessary.")
+            return
+
+        # Write the modified contents back to the file
+        try:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(modified_contents)
+            print("FixHostFilePermissions script updated successfully.")
+        except Exception as e:
+            print(f"Failed to write to the file: {e}")
+
     def install_sshd(self):
 
         """Install the sshd service using the OpenSSH provided PowerShell script."""
@@ -149,8 +186,6 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
             msg_in=f"Installing sshd service from {install_script}...",
             msg_out="sshd service installed successfully."
         )
-
-        self.fix_host_file_permissions()
 
     def configure_ssh_service(self):
 
@@ -219,7 +254,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         cmd = [
             "-Command ", "New-NetFirewallRule ",
             "-Name ", "sshd ",
-            "-DisplayName ", "OpenSSH Server (sshd) ",
+            "-DisplayName ", "'OpenSSH Server (sshd)'",
             "-Enabled ", "True ",
             "-Direction Inbound ", "-Protocol TCP ",
             "-Action ", "Allow ",
@@ -351,6 +386,17 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         except Exception as e:
             print(f"Failed to update sshd_config for Administrator: {e}")
 
+    def create_host_keys(self):
+
+        self.execute_command(
+            [
+                self.open_ssh_program_files_path / "ssh-keygen.exe",
+                "-A",
+            ],
+            check=True,
+            msg_in="Generating all missing host keys..."
+        )
+
     def handle_installation(self):
 
         if not self.check_if_installed():
@@ -358,6 +404,9 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
 
         self.add_open_ssh_to_path()
         self.setup_ssh_program_data()
+        self.create_host_keys()
+        self.update_fix_host_permissions_script()
+        self.fix_host_file_permissions()
         self.configure_firewall()
         self.configure_authorized_keys()
         self.update_sshd_config()
