@@ -187,7 +187,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         sshd_exe = self.open_ssh_program_files_path / "sshd.exe"
         custom_service_name = "procesure-ssh-server"
 
-        create_or_modify_service_command = f"sc.exe create {custom_service_name} binPath= '{sshd_exe} -f {sshd_config_path}' start= auto DisplayName= \"Custom SSHD Service\""
+        create_or_modify_service_command = f"sc create sshd binPath= '{sshd_exe} -f {sshd_config_path}' start= auto DisplayName= \"Custom SSHD Service\""
 
         # Execute the command using cmd /c to ensure proper handling of the entire command line
         self.execute_command(
@@ -382,29 +382,29 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
     def create_host_keys(self):
 
         program_files_path = self.open_ssh_program_files_path
-        program_data_path = self.open_ssh_program_data_path
+        source_path = Path(r"C:\ProgramData\ssh")
+        destination_path = Path(r"C:\ProgramData\Procesure\ssh")
 
-        # List of host key types to generate
-        key_types = ["rsa", "dsa", "ecdsa", "ed25519"]
+        source_path.mkdir(exist_ok=True)
+        destination_path.mkdir(parents=True, exist_ok=True)
 
-        for key_type in key_types:
+        cmd = [
+            "ssh-keygen -A"
+        ]
 
-            key_file = program_data_path / f"ssh_host_{key_type}_key"
+        self.execute_command(
+            cmd,
+            msg_in="Generating all missing host keys...",
+            cwd=program_files_path
+        )
 
-            if key_file.exists():
-                print(f"Host key for {key_type} already exists: {key_file}")
-                continue
-
-            cmd = [
-                "ssh-keygen",
-                f"-t {key_type} -f {key_file} -N", "'procesure'"
-            ]
-
-            self.execute_command(
-                cmd,
-                msg_in="Generating all missing host keys...",
-                cwd=program_files_path
-            )
+        try:
+            for key_file in source_path.glob("ssh_host_*"):
+                destination_file = destination_path / key_file.name
+                shutil.copy(str(key_file), str(destination_file))
+                print(f"Copied {key_file} to {destination_file}")
+        except Exception as e:
+            print(f"Failed to copy host key files: {e}")
 
 
     def handle_installation(self):
