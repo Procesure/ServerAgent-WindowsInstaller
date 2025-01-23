@@ -135,42 +135,16 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
             shutil.copy(default_config_path, sshd_config_path)
             print(f"Moved {default_config_path} to {sshd_config_path}")
 
-    def update_fix_host_permissions_script(self):
+    def overwrite_fix_host_permissions_script(self):
 
-        # Define the search and replace strings
-        file_path = Path(self.open_ssh_program_files_path / "FixHostFilePermissions.ps1")
+        source_script_path = "./scripts/FixHostFilePermissions.ps1"
+        target_script_path = Path(self.open_ssh_program_files_path / "FixHostFilePermissions.ps1")
 
-        search_string = r'ProgramData\ssh'
-        replace_string = r'ProgramData\Procesure\ssh'
-
-        # Check if the file exists
-        if not os.path.isfile(file_path):
-            print(f"Error: The file {file_path} does not exist.")
-            return
-
-        # Read the contents of the file
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                contents = file.read()
+            shutil.move(source_script_path, target_script_path)
+            print(f"FixHostFilePermissions.ps1 script successfully copied to {target_script_path}.")
         except Exception as e:
-            print(f"Failed to read the file: {e}")
-            return
-
-        # Replace the target string
-        modified_contents = contents.replace(search_string, replace_string)
-
-        # Check if changes were made
-        if contents == modified_contents:
-            print("No changes were necessary.")
-            return
-
-        # Write the modified contents back to the file
-        try:
-            with open(file_path, 'w', encoding='utf-8') as file:
-                file.write(modified_contents)
-            print("FixHostFilePermissions script updated successfully.")
-        except Exception as e:
-            print(f"Failed to write to the file: {e}")
+            print(f"Failed to copy the file: {e}")
 
     def install_sshd(self):
 
@@ -206,15 +180,14 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         )
 
     def create_sshd_service(self):
+
         """Install a custom named sshd service using the specified executable and configuration file."""
 
         sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
-        sshd_exe = self.open_ssh_program_files_path / "OpenSSH-Win64" / "sshd.exe"
+        sshd_exe = self.open_ssh_program_files_path / "sshd.exe"
         custom_service_name = "procesure-ssh-server"
 
-        bin_path = f'"{sshd_exe}" -f "{sshd_config_path}"'
-
-        create_or_modify_service_command = f"sc.exe create {custom_service_name} binPath= {bin_path} start= auto DisplayName= \"Custom SSHD Service\""
+        create_or_modify_service_command = f"sc.exe create {custom_service_name} binPath= '{sshd_exe} -f {sshd_config_path}' start= auto DisplayName= \"Custom SSHD Service\""
 
         # Execute the command using cmd /c to ensure proper handling of the entire command line
         self.execute_command(
@@ -228,7 +201,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         """Configures the custom SSHD service to use a specific configuration file."""
 
         sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
-        sshd_exe = self.open_ssh_program_files_path / "OpenSSH-Win64" / "sshd.exe"
+        sshd_exe = self.open_ssh_program_files_path / "sshd.exe"
 
         custom_service_name = "procesure-ssh-server"
 
@@ -251,22 +224,43 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
 
     def configure_firewall(self):
 
+        rule_name = "procesure-server-agent"
+        display_name = "'Procesure Server Agent'"
+        local_port = "2222"
+
         cmd = [
-            "-Command ", "New-NetFirewallRule ",
-            "-Name ", "sshd ",
-            "-DisplayName ", "'OpenSSH Server (sshd)'",
-            "-Enabled ", "True ",
-            "-Direction Inbound ", "-Protocol TCP ",
-            "-Action ", "Allow ",
-            "-LocalPort ", "2222"
+            "-Command",
+            f"Get-NetFirewallRule -Name {rule_name} -ErrorAction SilentlyContinue"
         ]
 
-        self.execute_command(
-            cmd,
-            msg_in="Configuring firewall for SSHD...",
-            msg_out="Firewall configured for SSHD.",
-            msg_error="Failed to configure firewall for SSHD."
-        )
+        try:
+
+            status, result = self.execute_command(
+                cmd
+            )
+
+            if result.returncode == 0 and result.stdout.strip():
+
+                print(f"Firewall rule '{rule_name}' already exists.")
+                return
+
+            print(f"Firewall rule '{rule_name}' does not exist. Creating it...")
+
+            cmd = [
+                "-Command",
+                f"New-NetFirewallRule -Name {rule_name} -DisplayName {display_name} -Enabled True "
+                f"-Direction Inbound -Protocol TCP -Action Allow -LocalPort {local_port}"
+            ]
+
+            self.execute_command(
+                cmd,
+                msg_in="Creating new firewall rule...",
+                msg_out="Firewall rule created successfully.",
+                msg_error="Failed to create the firewall rule."
+            )
+
+        except Exception as e:
+            print(f"Error checking or configuring the firewall rule: {e}")
 
     def configure_authorized_keys(self):
 
@@ -346,11 +340,10 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
                 config_lines = f.readlines()
 
             # Prepare the Match User directive with additional configurations
-            match_directive = "Match User Administrator\n"
+            match_directive = f"Match User {self.config.username}\n"
             match_settings = [
-                "       AuthorizedKeysFile Administrator/.procesure/ssh/authorized_keys\n",
-                "       Port 2222\n",
-                "       TCPForwarding yes\n",
+                f"       AuthorizedKeysFile {self.config.username}/.procesure/ssh/authorized_keys\n",
+                "       AllowTcpForwarding yes\n",
                 "       PubkeyAuthentication yes\n",
                 "       PasswordAuthentication no\n"
             ]
@@ -388,28 +381,31 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
 
     def create_host_keys(self):
 
-        program_files_path = self.open_ssh_program_files_path  # e.g., C:\Program Files\Procesure\OpenSSH-Win64
-        program_data_path = self.open_ssh_program_data_path  # e.g., C:\ProgramData\Procesure\ssh
-        ssh_keygen_path = program_files_path / "ssh-keygen.exe"
+        program_files_path = self.open_ssh_program_files_path
+        program_data_path = self.open_ssh_program_data_path
 
-        # Generate host keys in the Program Files directory
-        self.execute_command(
-            [
-                f"& \"{ssh_keygen_path}\" -A",
-                "-A",
-            ],
-            msg_in="Generating all missing host keys..."
-        )
+        # List of host key types to generate
+        key_types = ["rsa", "dsa", "ecdsa", "ed25519"]
 
-        # Move the generated host keys to ProgramData
-        for key_file in program_files_path.glob("ssh_host_*"):
-            # Define the destination path in ProgramData
-            target_path = program_data_path / key_file.name
+        for key_type in key_types:
 
-            # Move the key to ProgramData
-            shutil.move(str(key_file), str(target_path))
+            key_file = program_data_path / f"ssh_host_{key_type}_key"
 
-            print(f"Moved {key_file} to {target_path}")
+            if key_file.exists():
+                print(f"Host key for {key_type} already exists: {key_file}")
+                continue
+
+            cmd = [
+                "ssh-keygen",
+                f"-t {key_type} -f {key_file} -N", "'procesure'"
+            ]
+
+            self.execute_command(
+                cmd,
+                msg_in="Generating all missing host keys...",
+                cwd=program_files_path
+            )
+
 
     def handle_installation(self):
 
@@ -419,7 +415,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         self.add_open_ssh_to_path()
         self.setup_ssh_program_data()
         self.create_host_keys()
-        self.update_fix_host_permissions_script()
+        self.overwrite_fix_host_permissions_script()
         self.fix_host_file_permissions()
         self.configure_firewall()
         self.configure_authorized_keys()
