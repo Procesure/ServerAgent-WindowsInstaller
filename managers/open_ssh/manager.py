@@ -388,14 +388,28 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
 
     def create_host_keys(self):
 
+        program_files_path = self.open_ssh_program_files_path  # e.g., C:\Program Files\Procesure\OpenSSH-Win64
+        program_data_path = self.open_ssh_program_data_path  # e.g., C:\ProgramData\Procesure\ssh
+        ssh_keygen_path = program_files_path / "ssh-keygen.exe"
+
+        # Generate host keys in the Program Files directory
         self.execute_command(
             [
-                self.open_ssh_program_files_path / "ssh-keygen.exe",
+                f"& \"{ssh_keygen_path}\" -A",
                 "-A",
             ],
-            check=True,
             msg_in="Generating all missing host keys..."
         )
+
+        # Move the generated host keys to ProgramData
+        for key_file in program_files_path.glob("ssh_host_*"):
+            # Define the destination path in ProgramData
+            target_path = program_data_path / key_file.name
+
+            # Move the key to ProgramData
+            shutil.move(str(key_file), str(target_path))
+
+            print(f"Moved {key_file} to {target_path}")
 
     def handle_installation(self):
 
