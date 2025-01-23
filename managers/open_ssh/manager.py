@@ -170,6 +170,36 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
             msg_out="sshd service configured to use custom configuration."
         )
 
+    def create_sshd_service(self):
+        """Install a custom named sshd service using the specified executable and configuration file."""
+
+        sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
+        sshd_exe = self.open_ssh_program_files_path / "OpenSSH-Win64" / "sshd.exe"
+        custom_service_name = "procesure-ssh-server"
+
+        bin_path = f'"{sshd_exe}" -f "{sshd_config_path}"'
+
+        create_or_modify_service_command = f"sc.exe create {custom_service_name} binPath= {bin_path} start= auto DisplayName= \"Custom SSHD Service\""
+
+        # Execute the command using cmd /c to ensure proper handling of the entire command line
+        self.execute_command(
+            ["cmd", "/c", create_or_modify_service_command],
+            msg_in="Creating or modifying custom sshd service...",
+            msg_out="Custom sshd service created or modified successfully."
+        )
+
+    def configure_sshd_service(self):
+
+        """Configures the custom SSHD service to use a specific configuration file."""
+
+        sshd_config_path = self.open_ssh_program_data_path / "sshd_config"
+        sshd_exe = self.open_ssh_program_files_path / "OpenSSH-Win64" / "sshd.exe"
+
+        custom_service_name = "procesure-ssh-server"
+
+        bin_path_command = f'sc.exe config {custom_service_name} binPath= "{sshd_exe} -f {sshd_config_path}" start= auto'
+        self.execute_command(["cmd", "/c", bin_path_command])
+
     def restart_sshd_service(self):
 
         """Restart the sshd service to apply new configurations."""
@@ -254,6 +284,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         )
 
     def update_sshd_config(self):
+
         """Update sshd_config to adjust user-specific settings and ensure proper formatting."""
 
         try:
@@ -331,6 +362,7 @@ class WinServer2016OpenSSHManager(OpenSSHManager, ABC):
         self.configure_authorized_keys()
         self.update_sshd_config()
         self.install_sshd()
+        self.create_sshd_service()
         self.configure_ssh_service()
         self.restart_sshd_service()
 
