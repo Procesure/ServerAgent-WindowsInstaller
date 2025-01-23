@@ -1,8 +1,10 @@
-from managers.open_ssh.manager import WinServer2016OpenSSHManager
-from managers.procesure.manager import ProcesureManager
+from managers.server.manager import WinServer2016ServerManager
+from managers.agent.manager import AgentManager
 from managers.rdp.manager import RDPManager
-from .base_installer import BaseInstaller
+from installers.base_installer import BaseInstaller
 from .models import *
+
+from managers.service.manager import ServiceManager
 
 
 class WinServer2016Installer(BaseInstaller):
@@ -15,10 +17,12 @@ class WinServer2016Installer(BaseInstaller):
     def handle_installations(config: InstallationConfig):
 
         installation_classes = [
-            WinServer2016OpenSSHManager(config=config.ssh),
-            ProcesureManager(config=config.tcp),
+            WinServer2016ServerManager(config=config.ssh),
+            AgentManager(config=config.tcp),
             RDPManager(config=config.rdp)
         ]
 
         for installation_class in installation_classes:
             installation_class.handle_installation()
+
+        ServiceManager.to_exe()

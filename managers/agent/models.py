@@ -2,9 +2,9 @@ import re
 from pydantic import BaseModel, StrictStr, Field, field_validator
 
 
-class TCPConfig(BaseModel):
+class AgentConfig(BaseModel):
 
-    address: StrictStr = Field(description="The TCP address in the format 'hostname:port', e.g., '123.io.procesure:23090'")
+    address: StrictStr = Field(description="The TCP address in the format 'hostname:port', e.g., '123.io.agent:23090'")
     token: StrictStr = Field(description="The token that allows connection to the address.")
 
     @classmethod
@@ -13,7 +13,7 @@ class TCPConfig(BaseModel):
         pattern = r'^(?P<host>[\w.-]+):(?P<port>\d+)$'
         match = re.match(pattern, value)
         if not match:
-            raise ValueError("Address must be in the format 'hostname:port', e.g., '123.io.procesure:23090'")
+            raise ValueError("Address must be in the format 'hostname:port', e.g., '123.io.agent:23090'")
 
         port = int(match.group('port'))
         if not (1 <= port <= 65535):

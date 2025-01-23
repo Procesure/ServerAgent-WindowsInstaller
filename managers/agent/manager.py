@@ -1,29 +1,28 @@
 import os
-import subprocess
 import requests
 import yaml
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 from managers.manager import BaseManager
-from .models import TCPConfig
+from .models import AgentConfig
 
 
-class ProcesureManager(BaseManager):
+class AgentManager(BaseManager):
 
     def __init__(
         self,
-        config: TCPConfig
+        config: AgentConfig
     ):
         super().__init__()
-        self.config: TCPConfig = config
+        self.config: AgentConfig = config
 
-    def download_procesure(self):
+    def download_agent(self):
 
-        """Download and install procesure (procesure)."""
+        """Download and install agent (agent)."""
 
         procesure_url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip"
-        procesure_zip = self.program_files_path / "procesure.zip"
+        procesure_zip = self.program_files_path / "agent.zip"
 
         try:
 
@@ -34,13 +33,14 @@ class ProcesureManager(BaseManager):
                 print(f"{self.procesure_exe_path} already exists. Skipping download.")
                 return
 
-            print("Downloading procesure...")
+            print("Downloading agent...")
             response = requests.get(procesure_url)
             response.raise_for_status()
+
             with open(procesure_zip, "wb") as f:
                 f.write(response.content)
 
-            print("Extracting procesure...")
+            print("Extracting agent...")
 
             with zipfile.ZipFile(procesure_zip, "r") as zip_ref:
                 zip_ref.extractall(self.program_files_path)
@@ -55,11 +55,11 @@ class ProcesureManager(BaseManager):
             if procesure_zip.exists():
                 procesure_zip.unlink()
 
-            raise RuntimeError(f"Failed to download or install procesure: {e}")
+            raise RuntimeError(f"Failed to download or install agent: {e}")
 
-    def create_tcp_config(self):
+    def create_tcp_config(self, port: int = 2222):
         
-        """Create procesure TCP configuration file."""
+        """Create agent TCP configuration file."""
         
         config = {
             "version": "3",
@@ -67,49 +67,20 @@ class ProcesureManager(BaseManager):
             "tunnels": {
                 "tcp": {
                     "proto": "tcp",
-                    "addr": 22,
+                    "addr": port,
                     "remote_addr": self.config.address,
                 }
             },
         }
 
+        config_file_path = Path(self.program_data_path) / "agent-config.yml"
+
         try:
-            with open(self.program_data_path, "w") as f:
+            with open(config_file_path, "w") as f:
                 yaml.safe_dump(config, f, default_flow_style=False)
-            print(f"Procesure configuration saved at {self.program_data_path}")
+            print(f"Procesure configuration saved at {config_file_path}")
         except Exception as e:
-            raise RuntimeError(f"Failed to create procesure configuration: {e}")
-
-    def create_service(self):
-
-        """Create the Procesure service using sc command."""
-
-        self.execute_command(
-            [
-                str(self.procesure_exe_path),
-                "service", "install", "--config",
-                str(self.server_agent_config_path)
-            ],
-            msg_in="Creating procesure service",
-            msg_out="Service create with success"
-        )
-
-    def start_service(self):
-
-        """Start the procesure service."""
-
-        self.execute_command(
-            [str(self.procesure_exe_path), "service", "start"],
-            msg_in="Starting procesure service",
-            msg_out="Procesure service has started successfully"
-        )
-
-
-    def delete_service(self):
-
-        self.execute_command(
-            [self.sc, "delete", "ngrok"]
-        )
+            raise RuntimeError(f"Failed to create agent configuration: {e}")
 
     def add_procesure_to_path(self):
 
@@ -137,8 +108,5 @@ class ProcesureManager(BaseManager):
 
     def handle_installation(self):
 
-        self.download_procesure()
+        self.download_agent()
         self.create_tcp_config()
-        self.delete_service()
-        self.create_service()
-        self.start_service()

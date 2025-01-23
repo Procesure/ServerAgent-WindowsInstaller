@@ -4,3 +4,4 @@ PyYAML>=6.0
 pyinstaller>=5.13.0
 pydantic~=2.10.5
 python-dotenv~=1.0.1
+pywin32

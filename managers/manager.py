@@ -22,11 +22,11 @@ class BaseManager:
 
     @property
     def server_agent_config_path(self) -> Path:
-        return self.program_data_path / "server-agent.yml"
+        return self.program_data_path / "agent.yml"
 
     @property
     def procesure_exe_path(self) -> Path:
-        return self.program_files_path / "procesure.exe"
+        return self.program_files_path / "agent.exe"
 
     def execute_command(
         self,

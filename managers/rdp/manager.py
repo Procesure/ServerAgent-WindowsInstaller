@@ -9,9 +9,8 @@ from .models import *
 
 class RDPManager(BaseManager):
 
-    powershell: str = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
     alias_ip: StrictStr = "127.0.0.2"
-    alias_name: StrictStr = "procesure"
+    alias_name: StrictStr = "agent"
 
     def __init__(self, config: RDPConfig):
 
@@ -92,7 +91,7 @@ class RDPManager(BaseManager):
 
         """Copies an RDP configuration file to the specified directory."""
 
-        source_path = "../../scripts/config.rdp"
+        source_path = "./scripts/config.rdp"
         destination_path = Path(self.program_data_path / "config.rdp")
         shutil.copy(source_path, destination_path)
         print(f"RDP configuration file copied to {destination_path}")
@@ -101,7 +100,7 @@ class RDPManager(BaseManager):
 
         """Copies an RDP configuration file to the specified directory."""
 
-        source_path = "../../scripts/start-rdp.bat"
+        source_path = "./scripts/start-rdp.bat"
         destination_path = Path(self.program_data_path / "start-rdp.bat")
         shutil.copy(source_path, destination_path)
         print(f"RDP configuration file copied to {destination_path}")
@@ -116,6 +115,8 @@ class RDPManager(BaseManager):
             self.create_windows_credentials()
             self.update_hosts_file()
             self.add_user_to_remote_desktop_allowed_users()
+            self.copy_rdp_config_file()
+            self.copy_start_rdp_file()
 
         except Exception as e:
 
