@@ -10,7 +10,11 @@ from managers.manager import BaseManager
 
 class ServerManager(BaseManager):
 
-    program_data_ssh: Path = Path(BaseManager.program_data_path / "ssh")
+    server_program_data_path: Path = Path(BaseManager.program_data_path / "ssh")
+    server_program_files_path: Path = Path(BaseManager.program_files_path / "server")
+    server_config_path: Path = Path(server_program_data_path / "sshd_config")
+    server_exe_path: Path = Path(server_program_files_path / "sshd.exe")
+
 
     common_installation_paths = [
         Path(r"C:\Program Files\OpenSSH-Win64"),
@@ -61,7 +65,6 @@ class ServerManager(BaseManager):
 
 class WinServer2016ServerManager(ServerManager, ABC):
 
-    server_program_files_path: Path = Path(ServerManager.program_files_path / "server")
 
     def __init__(self, config: ServerConfig):
         super().__init__(config)
@@ -69,11 +72,10 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def check_if_installed(self) -> bool:
 
-        sshd_path = self.server_program_files_path / "sshd.exe"
-
-        if sshd_path.exists():
+        if self.server_exe_path.exists():
             print("OpenSSH is already installed.")
             return True
+
         return False
 
     def download(self):
@@ -98,13 +100,12 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def setup_ssh_program_data(self):
 
-        self.program_data_ssh.mkdir(parents=True, exist_ok=True)
-        sshd_config_path = self.program_data_ssh / "sshd_config"
+        self.server_program_data_path.mkdir(parents=True, exist_ok=True)
         default_config_path = Path(Path.cwd() / "managers/server/sshd_config")
 
-        if not sshd_config_path.exists():
-            shutil.copy(default_config_path, sshd_config_path)
-            print(f"Moved {default_config_path} to {sshd_config_path}")
+        if not self.server_config_path.exists():
+            shutil.copy(default_config_path, self.server_config_path)
+            print(f"Moved {default_config_path} to {self.server_config_path}")
 
     def copy2_host_permissions_script(self):
 
@@ -121,15 +122,16 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
         """Install the sshd service using the OpenSSH provided PowerShell script."""
 
-        install_script = self.server_program_files_path / "install-sshd.ps1"
+        install_script = "install-sshd.ps1"
 
         self.execute_command(
             [
                 "-ExecutionPolicy", "Bypass",
-                "-File", str(install_script)
+                "-File", install_script
             ],
             msg_in=f"Installing sshd service from {install_script}...",
-            msg_out="sshd service installed successfully."
+            msg_out="sshd service installed successfully.",
+            cwd=self.server_program_files_path
         )
 
     def configure_firewall(self):
@@ -184,7 +186,6 @@ class WinServer2016ServerManager(ServerManager, ABC):
             if not authorized_keys_path.exists():
                 authorized_keys_path.touch()
 
-            # Append the public key if it's not already in the file
             with authorized_keys_path.open("a+") as f:
                 f.seek(0)
                 existing_keys = f.read()
@@ -209,17 +210,20 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def fix_host_file_permissions(self):
 
-        fix_host_permissions_path = self.server_program_files_path / "FixHostFilePermissions.ps1"
+        fix_host_permissions_path = "FixHostFilePermissions.ps1"
+
+        cmd = [
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-Command",
+            f"& './/{fix_host_permissions_path}' -Confirm:$false"
+        ]
 
         self.execute_command(
-            [
-                "-NoProfile",
-                "-ExecutionPolicy", "Bypass",
-                "-Command",
-                f"& '{fix_host_permissions_path}' -Confirm:$false"
-            ],
+            cmd,
             msg_in="Fixing host files permission",
-            msg_out="FixHostFilePermissions script executed successfully"
+            msg_out="FixHostFilePermissions script executed successfully",
+            cwd=self.server_program_files_path
         )
 
     def update_sshd_config(self):
@@ -228,7 +232,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
         try:
 
-            sshd_config_path = self.program_data_ssh / "sshd_config"
+            sshd_config_path = self.server_program_data_path / "sshd_config"
 
             # Ensure the configuration file exists or create a default one
             if not sshd_config_path.exists():
@@ -252,7 +256,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
             # Prepare the Match User directive with additional configurations
             match_directive = f"Match User {self.config.username}\n"
             match_settings = [
-                f"       AuthorizedKeysFile {self.config.username}/.agent/ssh/authorized_keys\n",
+                f"       AuthorizedKeysFile {self.config.username}/.procesure/ssh/authorized_keys\n",
                 "       AllowTcpForwarding yes\n",
                 "       PubkeyAuthentication yes\n",
                 "       PasswordAuthentication no\n"
@@ -291,26 +295,20 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def create_host_keys(self):
 
-        program_files_path = self.program_files_path
-        source_path = Path(r"C:\ProgramData\ssh")
-        destination_path = Path(r"C:\ProgramData\Procesure\ssh")
+        server_temp_key_path = Path("C:\ProgramData\ssh")
+        server_temp_key_path.mkdir(exist_ok=True)
 
-        source_path.mkdir(exist_ok=True)
-        destination_path.mkdir(parents=True, exist_ok=True)
-
-        cmd = [
-            "ssh-keygen -A"
-        ]
+        cmd = [f".//ssh-keygen", "-A"]
 
         self.execute_command(
             cmd,
             msg_in="Generating all missing host keys...",
-            cwd=program_files_path
+            cwd=self.server_program_files_path
         )
 
         try:
-            for key_file in source_path.glob("ssh_host_*"):
-                destination_file = destination_path / key_file.name
+            for key_file in server_temp_key_path.glob("ssh_host_*"):
+                destination_file = self.server_program_data_path / key_file.name
                 shutil.copy(str(key_file), str(destination_file))
                 print(f"Copied {key_file} to {destination_file}")
         except Exception as e:
@@ -332,4 +330,3 @@ class WinServer2016ServerManager(ServerManager, ABC):
         self.install_sshd()
 
 
-    

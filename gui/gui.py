@@ -141,9 +141,9 @@ class MultiStepInstaller(QMainWindow):
             if not token or not address:
                 raise ValueError("Authentication token and TCP address are required.")
 
-            self.config.tcp.token = token
-            self.config.tcp.address = address
-            self.config.ssh.public_key = public_key
+            self.config.agent.token = token
+            self.config.agent.address = address
+            self.config.server.public_key = public_key
 
         elif step_index == 1:
 
@@ -153,7 +153,7 @@ class MultiStepInstaller(QMainWindow):
             if not username or not password:
                 raise ValueError("Username and password are required.")
 
-            self.config.ssh.username = username
+            self.config.server.username = username
             self.config.rdp.username = username
             self.config.rdp.password = password
 

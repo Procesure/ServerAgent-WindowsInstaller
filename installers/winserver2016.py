@@ -17,8 +17,8 @@ class WinServer2016Installer(BaseInstaller):
     def handle_installations(config: InstallationConfig):
 
         installation_classes = [
-            WinServer2016ServerManager(config=config.ssh),
-            AgentManager(config=config.tcp),
+            WinServer2016ServerManager(config=config.server),
+            AgentManager(config=config.agent),
             RDPManager(config=config.rdp)
         ]
 
@@ -26,3 +26,6 @@ class WinServer2016Installer(BaseInstaller):
             installation_class.handle_installation()
 
         ServiceManager.to_exe()
+        ServiceManager.install_service()
+        ServiceManager.start_service()
+

@@ -2,6 +2,8 @@ import os
 import requests
 import yaml
 import zipfile
+
+from collections import OrderedDict
 from pathlib import Path
 
 from managers.manager import BaseManager
@@ -9,6 +11,10 @@ from .models import AgentConfig
 
 
 class AgentManager(BaseManager):
+
+    agent_exe_path: Path = Path(BaseManager.program_files_path / "agent.exe")
+    agent_config_path: Path = Path(BaseManager.program_data_path / "agent-config.yml")
+
 
     def __init__(
         self,
@@ -58,27 +64,29 @@ class AgentManager(BaseManager):
             raise RuntimeError(f"Failed to download or install agent: {e}")
 
     def create_tcp_config(self, port: int = 2222):
-        
+
         """Create agent TCP configuration file."""
-        
+
+        # Use OrderedDict to ensure the order of keys
         config = {
             "version": "3",
-            "authtoken": self.config.token,
+            "agent": {
+                "authtoken": self.config.token,
+            },
             "tunnels": {
                 "tcp": {
                     "proto": "tcp",
                     "addr": port,
                     "remote_addr": self.config.address,
                 }
-            },
+            }
         }
 
-        config_file_path = Path(self.program_data_path) / "agent-config.yml"
 
         try:
-            with open(config_file_path, "w") as f:
-                yaml.safe_dump(config, f, default_flow_style=False)
-            print(f"Procesure configuration saved at {config_file_path}")
+            with open(self.agent_config_path, "w") as f:
+                yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False)
+            print(f"Procesure configuration saved at {self.agent_config_path}")
         except Exception as e:
             raise RuntimeError(f"Failed to create agent configuration: {e}")
 
