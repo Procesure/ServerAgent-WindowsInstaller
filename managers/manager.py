@@ -84,6 +84,7 @@ class BaseManager:
         msg_in: StrictStr = None,
         msg_out: StrictStr = None,
         msg_error: StrictStr = None,
+        log: callable = None,
         *args,
         **kwargs
     ) -> Union[
@@ -94,7 +95,10 @@ class BaseManager:
         try:
 
             if msg_in:
-                print(msg_in)
+                if log:
+                    log(msg_in)
+                else:
+                    print(msg_in)
 
             command = [f"{BaseManager.powershell} ", *cmd]
 
@@ -116,6 +120,14 @@ class BaseManager:
 
         except Exception as e:
             if msg_error:
+                if log:
+                    log(msg_error)
+                else:
+                    print(msg_error)
                 print(msg_error)
+            if log:
+                log(str(e))
+            else:
+                print(e)
             print(f"Failed to start process: {e}")
             return 1, e

@@ -9,6 +9,27 @@ from typing import Union
 import servicemanager
 import sys
 
+import logging
+
+def setup_logging():
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        filename=r'C:\ProgramData\Procesure\service-manager.log',
+        filemode='a'  # Append mode
+    )
+
+def log(message, level='info'):
+    if level == 'info':
+        logging.info(message)
+    elif level == 'error':
+        logging.error(message)
+    elif level == 'debug':
+        logging.debug(message)
+    else:
+        logging.warning(message)
+
 
 class ServiceManager(win32serviceutil.ServiceFramework):
 
@@ -17,6 +38,10 @@ class ServiceManager(win32serviceutil.ServiceFramework):
     _svc_description_ = "Manages processes required by Procesure."
 
     def __init__(self, args):
+
+        setup_logging()
+
+        log(message="Initiating procesure service")
 
         super().__init__(args)
 
@@ -29,6 +54,7 @@ class ServiceManager(win32serviceutil.ServiceFramework):
 
         """Main service logic."""
 
+        log(message="Accessing service entry point")
         self.ReportServiceStatus(win32service.SERVICE_RUNNING)
         self.main_loop()
         win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)
@@ -135,6 +161,8 @@ class ServiceManager(win32serviceutil.ServiceFramework):
 
     def __start_server(self):
 
+        log(message="Server started")
+
         cmd = [f".//sshd -f '{self.server_config_path}'"]
 
         BaseManager.execute_bkg_command(
@@ -142,12 +170,17 @@ class ServiceManager(win32serviceutil.ServiceFramework):
             msg_in="Starting Procesure Server...",
             msg_out=f"Procesure Server started successfully",
             msg_error="Failed to start Procesure Server.",
+            log=log,
             cwd=self.server_program_files_path
         )
+
+        log(message="Server started")
 
         self.server_process = True
 
     def __start_agent(self):
+
+        log("Starting agent")
 
         cmd = [
             f".//agent start --all --config='{self.agent_config_path}'"
@@ -161,9 +194,13 @@ class ServiceManager(win32serviceutil.ServiceFramework):
             cwd=self.program_files_path
         )
 
+        log("Agent started")
+
         self.agent_process = True
 
     def main(self):
+
+        log(message="Entering main method")
 
         if not self.server_process:
             self.__start_server()
