@@ -1,20 +1,13 @@
-import os
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from .models import ServerConfig
-from typing import List, Union
 
 from managers.manager import BaseManager
+from gui.logger import GUILogger
 
 
 class ServerManager(BaseManager):
-
-    server_program_data_path: Path = Path(BaseManager.program_data_path / "ssh")
-    server_program_files_path: Path = Path(BaseManager.program_files_path / "server")
-    server_config_path: Path = Path(server_program_data_path / "sshd_config")
-    server_exe_path: Path = Path(server_program_files_path / "sshd.exe")
-
 
     common_installation_paths = [
         Path(r"C:\Program Files\OpenSSH-Win64"),
@@ -22,8 +15,8 @@ class ServerManager(BaseManager):
         Path(r"C:\Program Files (x86)\OpenSSH"),
     ]
 
-    def __init__(self, config: ServerConfig):
-        super().__init__()
+    def __init__(self, config: ServerConfig, logger: GUILogger):
+        super().__init__(logger)
         self.config = config
 
     @abstractmethod
@@ -66,19 +59,23 @@ class ServerManager(BaseManager):
 class WinServer2016ServerManager(ServerManager, ABC):
 
 
-    def __init__(self, config: ServerConfig):
-        super().__init__(config)
-        self.config = config
+    def __init__(self, config: ServerConfig, logger: GUILogger):
+        super().__init__(config, logger)
 
-    def check_if_installed(self) -> bool:
+    def check_if_downloaded(self) -> bool:
 
+        self.logger.log("Checking if Procesure SSH Server is already downloaded")
         if self.server_exe_path.exists():
-            print("OpenSSH is already installed.")
+            self.logger.log("Procesure SSH Server is already downloaded. Skipping download")
             return True
 
         return False
 
     def download(self):
+
+        msg_in = "Downloading Procesure SSH Server ..."
+        msg_out = "Procesure SSH Server has been downloaded."
+        msg_error = "Failed to download Procesure SSH Server."
 
         cmd = [
             "-Command",
@@ -89,16 +86,18 @@ class WinServer2016ServerManager(ServerManager, ABC):
             f"Remove-Item -Path '{self.program_files_path / 'openssh.zip'}'"
         ]
 
-        self.execute_command(
+        status, result = self.execute_command(
             cmd,
-            msg_in="Starting OpenSSH installation...",
-            msg_out="OpenSSH has been installed.",
-            msg_error="Failed to install OpenSSH."
+            msg_in=msg_in,
+            msg_out=msg_out,
+            msg_error=msg_error
         )
 
         Path(self.program_files_path / "OpenSSH-Win64").rename(Path(self.server_program_files_path))
 
     def setup_ssh_program_data(self):
+
+        self.logger.log("Setting SSH Server program data")
 
         self.server_program_data_path.mkdir(parents=True, exist_ok=True)
         default_config_path = Path(Path.cwd() / "managers/server/sshd_config")
@@ -108,6 +107,8 @@ class WinServer2016ServerManager(ServerManager, ABC):
             print(f"Moved {default_config_path} to {self.server_config_path}")
 
     def copy2_host_permissions_script(self):
+
+        self.logger.log("Copying host permissions script.")
 
         source_script_path = "./scripts/FixHostFilePermissions.ps1"
         target_script_path = Path(self.server_program_files_path / "FixHostFilePermissions.ps1")
@@ -124,17 +125,24 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
         install_script = "install-sshd.ps1"
 
-        self.execute_command(
+        msg_in = f"Installing Procesure Server from {self.server_program_files_path / install_script}...",
+        msg_out = "Procesure SSH Server installed successfully"
+        msg_error = "Failed to install Procesure SSH Server"
+
+        status, result = self.execute_command(
             [
                 "-ExecutionPolicy", "Bypass",
                 "-File", install_script
             ],
-            msg_in=f"Installing sshd service from {install_script}...",
-            msg_out="sshd service installed successfully.",
+            msg_in=msg_in,
+            msg_out=msg_out,
+            msg_error=msg_error,
             cwd=self.server_program_files_path
         )
 
     def configure_firewall(self):
+
+        self.logger.log("Configuring firewall to accept incoming tcp traffic on port 2222")
 
         rule_name = "agent-agent"
         display_name = "'Procesure Server Agent'"
@@ -176,6 +184,8 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def configure_authorized_keys(self):
 
+        self.logger.log("Configuring authorized keys")
+
         try:
 
             user_ssh_path = Path(f"C:/Users/{self.config.username}/.procesure/ssh")
@@ -210,6 +220,8 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def fix_host_file_permissions(self):
 
+        self.logger.log("Fixing host file permissions")
+
         fix_host_permissions_path = "FixHostFilePermissions.ps1"
 
         cmd = [
@@ -230,30 +242,26 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
         """Update sshd_config to adjust user-specific settings and ensure proper formatting."""
 
+        self.logger.log("Updating SSH Server config")
+
         try:
 
-            sshd_config_path = self.server_program_data_path / "sshd_config"
-
-            # Ensure the configuration file exists or create a default one
-            if not sshd_config_path.exists():
-                print(f"sshd_config not found at {sshd_config_path}, creating a new one...")
-                sshd_config_path.parent.mkdir(parents=True, exist_ok=True)
-                with sshd_config_path.open("w") as f:
+            if not self.server_config_path.exists():
+                print(f"sshd_config not found at {self.server_config_path}, creating a new one...")
+                self.server_config_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.server_config_path.open("w") as f:
                     f.write("# Default sshd_config generated by installer\n")
 
-            # Create a backup of the current configuration
-            sshd_config_backup = sshd_config_path.with_suffix(".bak")
+            sshd_config_backup = self.server_config_path.with_suffix(".bak")
             if not sshd_config_backup.exists():
-                sshd_config_backup.write_text(sshd_config_path.read_text())
+                sshd_config_backup.write_text(self.server_config_path.read_text())
                 print(f"Backed up sshd_config to {sshd_config_backup}")
             else:
                 print(f"Backup already exists at {sshd_config_backup}, skipping backup.")
 
-            # Read the current sshd_config
-            with sshd_config_path.open("r") as f:
+            with self.server_config_path.open("r") as f:
                 config_lines = f.readlines()
 
-            # Prepare the Match User directive with additional configurations
             match_directive = f"Match User {self.config.username}\n"
             match_settings = [
                 f"       AuthorizedKeysFile {self.config.username}/.procesure/ssh/authorized_keys\n",
@@ -262,21 +270,17 @@ class WinServer2016ServerManager(ServerManager, ABC):
                 "       PasswordAuthentication no\n"
             ]
 
-            # Determine where to insert or update the Match User directive
             match_index = -1
             for i, line in enumerate(config_lines):
                 if line.strip() == match_directive.strip():
                     match_index = i
                     break
 
-            # Insert or update the Match User block
             if match_index == -1:
-                # Insert new Match block if not found
-                config_lines.append("\n")  # Ensure it starts on a new line
+                config_lines.append("\n")
                 config_lines.append(match_directive)
                 config_lines.extend(match_settings)
             else:
-                # Update existing Match block
                 end_index = len(config_lines)
                 for j in range(match_index + 1, len(config_lines)):
                     if config_lines[j].strip().startswith("Match "):
@@ -284,14 +288,13 @@ class WinServer2016ServerManager(ServerManager, ABC):
                         break
                 config_lines[match_index + 1:end_index] = match_settings
 
-            # Write the updated configuration back to the file
-            with sshd_config_path.open("w") as f:
+            with self.server_config_path.open("w") as f:
                 f.writelines(config_lines)
 
-            print(f"Updated Match User directive for Administrator in sshd_config.")
+            self.logger.log(f"Updated Match User directive for Administrator in sshd_config.")
 
         except Exception as e:
-            print(f"Failed to update sshd_config for Administrator: {e}")
+            self.logger.log(f"Failed to update sshd_config for Administrator: {e}")
 
     def create_host_keys(self):
 

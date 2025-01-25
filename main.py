@@ -13,6 +13,7 @@ load_dotenv()
 if __name__ == "__main__":
 
     ServiceManager.to_exe()
+
     #ServiceManager.install_service()
     #ServiceManager.uninstall_service()
 

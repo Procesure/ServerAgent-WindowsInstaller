@@ -6,15 +6,16 @@ from pathlib import Path
 from managers.manager import BaseManager
 from .models import *
 
+from gui.logger import GUILogger
 
 class RDPManager(BaseManager):
 
     alias_ip: StrictStr = "127.0.0.2"
     alias_name: StrictStr = "agent"
 
-    def __init__(self, config: RDPConfig):
+    def __init__(self, config: RDPConfig, logger: GUILogger):
 
-        super().__init__()
+        super().__init__(logger)
         self.config: RDPConfig = config
 
     def enable_rdp(self):
@@ -94,7 +95,7 @@ class RDPManager(BaseManager):
         source_path = "./scripts/config.rdp"
         destination_path = Path(self.program_data_path / "config.rdp")
         shutil.copy(source_path, destination_path)
-        print(f"RDP configuration file copied to {destination_path}")
+        self.logger.log(f"RDP configuration file copied to {destination_path}")
 
     def copy_start_rdp_file(self):
 
@@ -103,7 +104,7 @@ class RDPManager(BaseManager):
         source_path = "./scripts/start-rdp.bat"
         destination_path = Path(self.program_data_path / "start-rdp.bat")
         shutil.copy(source_path, destination_path)
-        print(f"RDP configuration file copied to {destination_path}")
+        self.logger.log(f"Start RDP file copied to {destination_path}")
 
     def handle_installation(self):
 

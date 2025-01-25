@@ -17,7 +17,7 @@ def setup_logging():
         level=logging.DEBUG,
         format='%(asctime)s - %(levelname)s - %(message)s',
         filename=r'C:\ProgramData\Procesure\service-manager.log',
-        filemode='a'  # Append mode
+        filemode='a'
     )
 
 def log(message, level='info'):
@@ -47,8 +47,8 @@ class ServiceManager(win32serviceutil.ServiceFramework):
 
         self.running = True
         self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-        self.server_process: Union[bool, None] = None
-        self.agent_process: Union[bool, None] = None
+        self.server_process_running: bool = False
+        self.agent_process_running: bool = False
 
     def SvcDoRun(self):
 
@@ -161,9 +161,7 @@ class ServiceManager(win32serviceutil.ServiceFramework):
 
     def __start_server(self):
 
-        log(message="Server started")
-
-        cmd = [f".//sshd -f '{self.server_config_path}'"]
+        cmd = [f".//sshd -f '{BaseManager.server_config_path}'"]
 
         BaseManager.execute_bkg_command(
             cmd=cmd,
@@ -171,45 +169,39 @@ class ServiceManager(win32serviceutil.ServiceFramework):
             msg_out=f"Procesure Server started successfully",
             msg_error="Failed to start Procesure Server.",
             log=log,
-            cwd=self.server_program_files_path
+            cwd=BaseManager.server_program_files_path
         )
-
-        log(message="Server started")
-
-        self.server_process = True
+        
+        self.server_process_running = True
 
     def __start_agent(self):
 
-        log("Starting agent")
-
-        cmd = [
-            f".//agent start --all --config='{self.agent_config_path}'"
-        ]
+        cmd = [f".//agent start --all --config='{BaseManager.agent_config_path}'"]
 
         BaseManager.execute_bkg_command(
             cmd=cmd,
             msg_in="Starting Procesure Agent...",
             msg_out=f"Procesure Agent started successfully.",
             msg_error="Failed to start Procesure Agent.",
-            cwd=self.program_files_path
+            log=log,
+            cwd=BaseManager.agent_exe_path
         )
 
-        log("Agent started")
-
-        self.agent_process = True
+        self.agent_process_running = True
 
     def main(self):
 
         log(message="Entering main method")
 
-        if not self.server_process:
+        if not self.server_process_running:
             self.__start_server()
 
-        if not self.agent_process:
+        if not self.agent_process_running:
             self.__start_agent()
 
 
 if __name__ == '__main__':
+
     if len(sys.argv) == 1:
         servicemanager.Initialize()
         servicemanager.PrepareToHostSingle(ServiceManager)

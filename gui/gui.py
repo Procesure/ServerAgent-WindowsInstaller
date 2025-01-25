@@ -5,25 +5,33 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import pyqtSignal, QThread, Qt
 
+from .logger import GUILogger
+
 from installers.models import InstallationConfig
 
 
 class InstallationWorker(QThread):
+
     finished = pyqtSignal(str)  # Signal to emit completion message
 
     def __init__(
         self,
         config: InstallationConfig,
-        install_function: Callable[[InstallationConfig], None]
+        install_function: Callable[[InstallationConfig, GUILogger], None],
+        logger: GUILogger
     ) -> None:
 
         super().__init__()
         self.config = config
         self.install_function = install_function
+        self.logger = logger
 
     def run(self) -> None:
         try:
-            self.install_function(self.config)
+            self.install_function(
+                self.config,
+                self.logger
+            )
             self.finished.emit("Installation complete.")
         except Exception as e:
             self.finished.emit(f"Installation error: {e}")
@@ -33,15 +41,18 @@ class MultiStepInstaller(QMainWindow):
 
     def __init__(
         self,
-        install_function: Callable[[InstallationConfig], None]
+        install_function: Callable[[InstallationConfig, GUILogger], None]
     ) -> None:
 
         super().__init__()
 
         self.worker = None
+
         self.steps: QStackedWidget = QStackedWidget()
         self.config: InstallationConfig = InstallationConfig()
+
         self.log_output: QTextEdit = QTextEdit()
+
         self.tcp_token: QLineEdit = QLineEdit()
         self.tcp_address: QLineEdit = QLineEdit()
         self.ssh_public_key: QLineEdit = QLineEdit()
@@ -51,6 +62,8 @@ class MultiStepInstaller(QMainWindow):
         self.step1 = self.create_step1()
         self.step2 = self.create_step2()
         self.step3 = self.create_step3()
+
+        self.logger = GUILogger(self.log_output)
 
         self.init_ui()
         self.install_function = install_function
@@ -214,13 +227,19 @@ class MultiStepInstaller(QMainWindow):
     def start_installation(self) -> None:
 
         self.log_output.append("Starting installation...")
-        self.worker = InstallationWorker(config=self.config, install_function=self.install_function)
+
+        self.worker = InstallationWorker(
+            config=self.config,
+            logger=self.logger,
+            install_function=self.install_function
+        )
+
         self.worker.finished.connect(self.on_installation_finished)
         self.worker.start()
 
     def on_installation_finished(self, message: str, success: bool):
 
-        self.log_output.append(message)
+        self.logger.log(message)
 
         if success:
             self.finish_button.setEnabled(True)

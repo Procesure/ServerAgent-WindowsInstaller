@@ -3,7 +3,7 @@ from managers.agent.manager import AgentManager
 from managers.rdp.manager import RDPManager
 from installers.base_installer import BaseInstaller
 from .models import *
-
+from gui.logger import GUILogger
 from managers.service.manager import ServiceManager
 
 
@@ -14,12 +14,15 @@ class WinServer2016Installer(BaseInstaller):
         super().__init__()
 
     @staticmethod
-    def handle_installations(config: InstallationConfig):
+    def handle_installations(
+        config: InstallationConfig,
+        logger: GUILogger
+    ):
 
         installation_classes = [
-            WinServer2016ServerManager(config=config.server),
-            AgentManager(config=config.agent),
-            RDPManager(config=config.rdp)
+            WinServer2016ServerManager(config.server, logger),
+            AgentManager(config.agent, logger),
+            RDPManager(config.rdp, logger)
         ]
 
         for installation_class in installation_classes:

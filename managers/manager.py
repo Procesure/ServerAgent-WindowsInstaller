@@ -2,30 +2,33 @@ import subprocess
 from pathlib import Path
 from pydantic import StrictStr
 from typing import Union, Tuple, Any, List
+from gui.logger import GUILogger
 
 
 class BaseManager:
 
-
     program_data_path: Path = Path("C:\ProgramData\Procesure")
     program_files_path: Path = Path("C:\Program Files\Procesure")
+
+    server_program_files_path: Path = program_files_path / "server"
+    server_program_data_path: Path = program_data_path / "ssh"
+
+    server_exe_path: Path = server_program_files_path / "sshd.exe"
+    server_config_path: Path = server_program_data_path / "sshd_config"
+
+    agent_exe_path: Path = server_program_files_path / "agent.exe"
+    agent_config_path: Path = server_program_data_path / "agent-config.yml"
+
     powershell: Path = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
 
-    def __init__(self):
+    def __init__(self, logger: GUILogger):
 
+        self.logger = logger
         self.program_data_path.mkdir(exist_ok=True)
         self.program_files_path.mkdir(exist_ok=True)
 
-    @property
-    def server_agent_config_path(self) -> Path:
-        return self.program_data_path / "agent.yml"
-
-    @property
-    def procesure_exe_path(self) -> Path:
-        return self.program_files_path / "agent.exe"
-
-    @staticmethod
     def execute_command(
+        self,
         cmd: List[StrictStr],
         msg_in: StrictStr = None,
         msg_out: StrictStr = None,
@@ -40,7 +43,7 @@ class BaseManager:
 
         try:
 
-            print(msg_in)
+            self.logger.log(message=msg_in)
 
             command = [f"{BaseManager.powershell} ", *cmd]
 
@@ -53,24 +56,24 @@ class BaseManager:
                 **kwargs
             )
 
-            print("Command:", result.args)
-            print("Exit Code:", result.returncode)
-            print("Output:", result.stdout)
+            self.logger.log(message=f"Command: {result.args}")
+            self.logger.log(message=f"Exit Code: {result.returncode}")
+            self.logger.log(message=f"Output: {result.stdout}")
 
             if result.stderr:
-                print("Error:", result.stderr)
+                self.logger.log(f"Error: {result.stderr}")
 
-            print(msg_out)
+            self.logger.log(msg_out)
 
             return 0, result
 
         except subprocess.CalledProcessError as e:
-            print(msg_error)
-            print("Error details:")
-            print(f"Command: {e.cmd}")
-            print(f"Return code: {e.returncode}")
-            print(f"Output: {e.output}")
-            print(f"Error: {e.stderr}")
+            self.logger.log(msg_error)
+            self.logger.log("Error details:")
+            self.logger.log(f"Command: {e.cmd}")
+            self.logger.log(f"Return code: {e.returncode}")
+            self.logger.log(f"Output: {e.output}")
+            self.logger.log(f"Error: {e.stderr}")
             return 1, e
 
         except Exception as e:
@@ -78,13 +81,12 @@ class BaseManager:
             print(f"Unexpected error occurred: {e}")
             return 2, e
 
-    @staticmethod
     def execute_bkg_command(
+        self,
         cmd: List[StrictStr],
         msg_in: StrictStr = None,
         msg_out: StrictStr = None,
         msg_error: StrictStr = None,
-        log: callable = None,
         *args,
         **kwargs
     ) -> Union[
@@ -95,10 +97,7 @@ class BaseManager:
         try:
 
             if msg_in:
-                if log:
-                    log(msg_in)
-                else:
-                    print(msg_in)
+                self.logger.log(msg_in)
 
             command = [f"{BaseManager.powershell} ", *cmd]
 
@@ -111,23 +110,17 @@ class BaseManager:
                 **kwargs
             )
 
-            print(f"Command initiated: {' '.join(command)}")
+            self.logger.log(f"Command initiated: {' '.join(command)}")
 
             if msg_out:
-                print(msg_out)
+                self.logger.log(msg_out)
 
             return 0, process
 
         except Exception as e:
             if msg_error:
-                if log:
-                    log(msg_error)
-                else:
-                    print(msg_error)
-                print(msg_error)
-            if log:
-                log(str(e))
-            else:
-                print(e)
-            print(f"Failed to start process: {e}")
+                self.logger.log(msg_error)
+            self.logger.log(f"Failed to start process: {e}")
             return 1, e
+
+
