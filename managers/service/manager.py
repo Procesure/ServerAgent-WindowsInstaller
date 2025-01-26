@@ -1,94 +1,25 @@
 import shutil
-import time
 import win32serviceutil
 import win32service
-import win32event
 from pathlib import Path
-from managers.manager import BaseManager
-from typing import Union
-import servicemanager
-import sys
-
-import logging
-
-def setup_logging():
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        filename=r'C:\ProgramData\Procesure\service-manager.log',
-        filemode='a'
-    )
-
-def log(message, level='info'):
-    if level == 'info':
-        logging.info(message)
-    elif level == 'error':
-        logging.error(message)
-    elif level == 'debug':
-        logging.debug(message)
-    else:
-        logging.warning(message)
+from managers.manager import BaseManager, GUILogger
+from service.service import Service
 
 
-class ServiceManager(win32serviceutil.ServiceFramework):
+class ServiceManager(BaseManager):
 
-    _svc_name_ = "procesure"
-    _svc_display_name_ = "Procesure Service Manager"
-    _svc_description_ = "Manages processes required by Procesure."
+    def __init__(self, logger: GUILogger):
+        super().__init__(logger)
 
-    def __init__(self, args):
+    def to_exe(self):
 
-        setup_logging()
-
-        log(message="Initiating procesure service")
-
-        super().__init__(args)
-
-        self.running = True
-        self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-        self.server_process_running: bool = False
-        self.agent_process_running: bool = False
-
-    def SvcDoRun(self):
-
-        """Main service logic."""
-
-        log(message="Accessing service entry point")
-        self.ReportServiceStatus(win32service.SERVICE_RUNNING)
-        self.main_loop()
-        win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)
-
-    def main_loop(self):
-        while self.running:
-            try:
-                self.main()
-                time.sleep(60)
-            except Exception as e:
-                print(e)
-                self.running = False
-
-    def SvcStop(self):
-
-        """Cleanup logic when the service stops."""
-
-        self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-        win32event.SetEvent(self.stop_event)
-        self.running = False
-
-    @staticmethod
-    def to_exe():
-
-        svc_manager_path = Path("./managers/service/manager.py")
-        svc_manager_full_path = Path(svc_manager_path.parent.resolve() / "manager.py")
+        svc_manager_path = Path("./service/service.py")
+        svc_manager_full_path = Path(svc_manager_path.parent.resolve() / "service.py")
 
         temp_output_dir = Path(r"C:\Temp")
         temp_output_dir.mkdir(parents=True, exist_ok=True)
 
-        target_dir = Path(r"C:\Program Files\Procesure")
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        exe_name = "service-manager"
+        exe_name = "service"
 
         cmd = [
             "pyinstaller",
@@ -100,7 +31,7 @@ class ServiceManager(win32serviceutil.ServiceFramework):
             str(svc_manager_full_path)
         ]
 
-        BaseManager.execute_command(
+        self.execute_command(
             cmd=cmd,
             msg_in="Creating Procesure Service Manager...",
             msg_out=f"Procesure Service Manager created successfully in {temp_output_dir}",
@@ -108,7 +39,7 @@ class ServiceManager(win32serviceutil.ServiceFramework):
         )
 
         temp_exe_path = temp_output_dir / f"{exe_name}.exe"
-        target_exe_path = target_dir / f"{exe_name}.exe"
+        target_exe_path = self.program_files_path / f"{exe_name}.exe"
 
         if temp_exe_path.exists():
 
@@ -120,91 +51,39 @@ class ServiceManager(win32serviceutil.ServiceFramework):
         else:
             print(f"Executable not found in {temp_output_dir}.")
 
-    @staticmethod
-    def install_service():
+    def install_service(self):
+
         win32serviceutil.InstallService(
             exeName=r"C:\Program Files\Procesure\service-manager.exe",
-            pythonClassString=ServiceManager._svc_name_,
-            serviceName=ServiceManager._svc_name_,
-            displayName=ServiceManager._svc_display_name_,
-            description=ServiceManager._svc_description_,
+            pythonClassString=Service.name,
+            serviceName=Service.name,
+            displayName=Service.display_name,
+            description=Service.description,
             startType=win32service.SERVICE_AUTO_START
         )
-        print("Service installed successfully.")
 
-    @staticmethod
-    def uninstall_service():
+        self.logger.log("Service installed successfully.")
+
+    def uninstall_service(self):
 
         """Uninstall the service from the system."""
 
         try:
-            ServiceManager.stop_service()
-            print("Service stopped successfully.")
+            self.stop_service()
+            self.logger.log("Service stopped successfully.")
         except Exception as e:
-            print(f"Failed to stop the service: {e}")
+            self.logger.log(f"Failed to stop the service: {e}")
 
         try:
-            win32serviceutil.RemoveService(ServiceManager._svc_name_)
-            print("Service uninstalled successfully.")
+            win32serviceutil.RemoveService(ServiceManager.svc_name)
+            self.logger.log("Service uninstalled successfully.")
         except Exception as e:
-            print(f"Failed to uninstall the service: {e}")
+            self.logger.log(f"Failed to uninstall the service: {e}")
 
-    @staticmethod
-    def start_service():
-        win32serviceutil.StartService(ServiceManager._svc_name_)
-        print("Service started successfully.")
+    def start_service(self):
+        win32serviceutil.StartService(ServiceManager.svc_name)
+        self.logger.log("Service started successfully.")
 
-    @staticmethod
-    def stop_service():
-        win32serviceutil.StopService(ServiceManager._svc_name_)
-        print("Service stopped successfully.")
-
-    def __start_server(self):
-
-        cmd = [f".//sshd -f '{BaseManager.server_config_path}'"]
-
-        BaseManager.execute_bkg_command(
-            cmd=cmd,
-            msg_in="Starting Procesure Server...",
-            msg_out=f"Procesure Server started successfully",
-            msg_error="Failed to start Procesure Server.",
-            log=log,
-            cwd=BaseManager.server_program_files_path
-        )
-        
-        self.server_process_running = True
-
-    def __start_agent(self):
-
-        cmd = [f".//agent start --all --config='{BaseManager.agent_config_path}'"]
-
-        BaseManager.execute_bkg_command(
-            cmd=cmd,
-            msg_in="Starting Procesure Agent...",
-            msg_out=f"Procesure Agent started successfully.",
-            msg_error="Failed to start Procesure Agent.",
-            log=log,
-            cwd=BaseManager.agent_exe_path
-        )
-
-        self.agent_process_running = True
-
-    def main(self):
-
-        log(message="Entering main method")
-
-        if not self.server_process_running:
-            self.__start_server()
-
-        if not self.agent_process_running:
-            self.__start_agent()
-
-
-if __name__ == '__main__':
-
-    if len(sys.argv) == 1:
-        servicemanager.Initialize()
-        servicemanager.PrepareToHostSingle(ServiceManager)
-        servicemanager.StartServiceCtrlDispatcher()
-    else:
-        win32serviceutil.HandleCommandLine(ServiceManager)
+    def stop_service(self):
+        win32serviceutil.StopService(ServiceManager.svc_name)
+        self.logger.log("Service stopped successfully.")

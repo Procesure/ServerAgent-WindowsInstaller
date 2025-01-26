@@ -9,7 +9,6 @@ from managers.service.manager import ServiceManager
 
 class WinServer2016Installer(BaseInstaller):
 
-
     def __init__(self):
         super().__init__()
 
@@ -28,7 +27,8 @@ class WinServer2016Installer(BaseInstaller):
         for installation_class in installation_classes:
             installation_class.handle_installation()
 
-        ServiceManager.to_exe()
-        ServiceManager.install_service()
-        ServiceManager.start_service()
+        svc_manager = ServiceManager(logger)
+        svc_manager.to_exe()
+        svc_manager.install_service()
+        svc_manager.start_service()
 

@@ -12,13 +12,8 @@ load_dotenv()
 
 if __name__ == "__main__":
 
-    ServiceManager.to_exe()
-
-    #ServiceManager.install_service()
-    #ServiceManager.uninstall_service()
-
-    # installer = WinServer2016Installer()
-    # installer.start(installer.handle_installations)
+    installer = WinServer2016Installer()
+    installer.start(installer.handle_installations)
 
     # server_config = ServerConfig(
     #     username=os.getenv("SERVER_USERNAME"),
