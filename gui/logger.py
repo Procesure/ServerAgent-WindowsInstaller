@@ -1,34 +1,44 @@
 import logging
-
+from pathlib import Path
 from PyQt5.QtWidgets import QTextEdit
 
 
 class GUILogger:
 
-    def __init__(self, gui_log_output: QTextEdit):
+    log_file_path: Path = Path(r'C:\ProgramData\Procesure\installer-manager.log')
 
-        self.setup()
-        self.gui_log_output = gui_log_output
+    def __init__(self):
+        self.gui_log_output = None
+        self.logger = self.setup()
 
     @staticmethod
     def setup():
 
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            filename=r'C:\ProgramData\Procesure\installer-manager.log',
-            filemode='a'
-        )
+        logger = logging.getLogger('GUILogger')
+        logger.setLevel(logging.DEBUG)
+        GUILogger.log_file_path.parent.mkdir(exist_ok=True)
+
+        if not logger.handlers:
+            file_handler = logging.FileHandler(GUILogger.log_file_path, mode='a')
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+
+        return logger
+
+    def set_gui_log_output(self, gui_log_output: QTextEdit) -> None:
+        self.gui_log_output = gui_log_output
 
     def log(self, message: str, level="info"):
 
-        self.gui_log_output.append(message)
+        if self.gui_log_output:
+            self.gui_log_output.append(message)
 
-        if level == 'info':
-            logging.info(message)
-        elif level == 'error':
-            logging.error(message)
-        elif level == 'debug':
-            logging.debug(message)
-        else:
-            logging.warning(message)
+        {
+            'info': self.logger.info,
+            'error': self.logger.error,
+            'debug': self.logger.debug,
+            'warning': self.logger.warning
+        }[level](message)
+
+gui_logger = GUILogger()

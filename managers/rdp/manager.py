@@ -6,16 +6,19 @@ from pathlib import Path
 from managers.manager import BaseManager
 from .models import *
 
-from gui.logger import GUILogger
+from gui.logger import gui_logger
+
 
 class RDPManager(BaseManager):
+
+    class_name_intro = "=================================== Procesure RDP Manager ==================================="
 
     alias_ip: StrictStr = "127.0.0.2"
     alias_name: StrictStr = "agent"
 
-    def __init__(self, config: RDPConfig, logger: GUILogger):
+    def __init__(self, config: RDPConfig):
 
-        super().__init__(logger)
+        super().__init__(gui_logger)
         self.config: RDPConfig = config
 
     def enable_rdp(self):
@@ -33,6 +36,22 @@ class RDPManager(BaseManager):
             msg_in="Enabling RDP on the machine.",
             msg_out="RDP has been enabled",
             msg_error="Failed to enable RDP"
+        )
+
+    def disable_single_session_restriction(self):
+
+        """Disable the restriction of Remote Desktop Services users to a single session."""
+
+        cmd = [
+            "-Command",
+            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services' -Name 'fSingleSessionPerUser' -Value 0"
+        ]
+
+        self.execute_command(
+            cmd,
+            msg_in="Disabling single session restriction for RDS users.",
+            msg_out="Single session restriction disabled successfully.",
+            msg_error="Failed to disable single session restriction."
         )
 
     def create_windows_credentials(self):
@@ -113,6 +132,7 @@ class RDPManager(BaseManager):
         try:
 
             self.enable_rdp()
+            self.disable_single_session_restriction()
             self.create_windows_credentials()
             self.update_hosts_file()
             self.add_user_to_remote_desktop_allowed_users()

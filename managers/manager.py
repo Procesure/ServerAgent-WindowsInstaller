@@ -3,6 +3,7 @@ from pathlib import Path
 from pydantic import StrictStr
 from typing import Union, Tuple, Any, List
 from gui.logger import GUILogger
+from service.logger import ServiceLogger
 
 
 class BaseManager:
@@ -16,16 +17,23 @@ class BaseManager:
     server_exe_path: Path = server_program_files_path / "sshd.exe"
     server_config_path: Path = server_program_data_path / "sshd_config"
 
-    agent_exe_path: Path = server_program_files_path / "agent.exe"
-    agent_config_path: Path = server_program_data_path / "agent-config.yml"
+    agent_exe_path: Path = program_files_path / "agent.exe"
+    agent_config_path: Path = program_data_path / "agent-config.yml"
+
+    service_exe_path: Path = Path(r"C:\Program Files\Procesure\service.exe")
 
     powershell: Path = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
 
-    def __init__(self, logger: GUILogger):
+    def __init__(self, logger: Union[ServiceLogger, GUILogger]):
 
         self.logger = logger
-        self.program_data_path.mkdir(exist_ok=True)
-        self.program_files_path.mkdir(exist_ok=True)
+        self.make_program_dirs()
+
+    @staticmethod
+    def make_program_dirs():
+
+        BaseManager.program_data_path.mkdir(exist_ok=True)
+        BaseManager.program_files_path.mkdir(exist_ok=True)
 
     def execute_command(
         self,

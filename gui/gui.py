@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import pyqtSignal, QThread, Qt
 
-from .logger import GUILogger
+from .logger import gui_logger
 
 from installers.models import InstallationConfig
 
@@ -17,21 +17,16 @@ class InstallationWorker(QThread):
     def __init__(
         self,
         config: InstallationConfig,
-        install_function: Callable[[InstallationConfig, GUILogger], None],
-        logger: GUILogger
+        install_function: Callable[[InstallationConfig], None],
     ) -> None:
 
         super().__init__()
         self.config = config
         self.install_function = install_function
-        self.logger = logger
 
     def run(self) -> None:
         try:
-            self.install_function(
-                self.config,
-                self.logger
-            )
+            self.install_function(self.config)
             self.finished.emit("Installation complete.")
         except Exception as e:
             self.finished.emit(f"Installation error: {e}")
@@ -41,7 +36,7 @@ class MultiStepInstaller(QMainWindow):
 
     def __init__(
         self,
-        install_function: Callable[[InstallationConfig, GUILogger], None]
+        install_function: Callable[[InstallationConfig], None]
     ) -> None:
 
         super().__init__()
@@ -51,7 +46,9 @@ class MultiStepInstaller(QMainWindow):
         self.steps: QStackedWidget = QStackedWidget()
         self.config: InstallationConfig = InstallationConfig()
 
+        self.logger = gui_logger
         self.log_output: QTextEdit = QTextEdit()
+        self.logger.set_gui_log_output(self.log_output)
 
         self.tcp_token: QLineEdit = QLineEdit()
         self.tcp_address: QLineEdit = QLineEdit()
@@ -62,8 +59,6 @@ class MultiStepInstaller(QMainWindow):
         self.step1 = self.create_step1()
         self.step2 = self.create_step2()
         self.step3 = self.create_step3()
-
-        self.logger = GUILogger(self.log_output)
 
         self.init_ui()
         self.install_function = install_function
@@ -230,7 +225,6 @@ class MultiStepInstaller(QMainWindow):
 
         self.worker = InstallationWorker(
             config=self.config,
-            logger=self.logger,
             install_function=self.install_function
         )
 

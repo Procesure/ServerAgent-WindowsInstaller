@@ -82,9 +82,11 @@ class CommandExecutor:
         try:
 
             if msg_in:
-                self.logger.log(msg_in)
+                self.logger.log(message=msg_in)
 
             command = [f"{self.powershell} ", *cmd]
+
+            self.logger.log(command)
 
             process = subprocess.Popen(
                 command,
@@ -98,12 +100,12 @@ class CommandExecutor:
             self.logger.log(f"Command initiated: {' '.join(command)}")
 
             if msg_out:
-                self.logger.log(msg_out)
+                self.logger.log(message=msg_out)
 
             return 0, process
 
         except Exception as e:
             if msg_error:
-                self.logger.log(msg_error)
+                self.logger.log(message=msg_error)
             self.logger.log(f"Failed to start process: {e}")
             return 1, e

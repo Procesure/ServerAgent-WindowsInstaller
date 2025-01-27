@@ -4,7 +4,7 @@ from pathlib import Path
 from .models import ServerConfig
 
 from managers.manager import BaseManager
-from gui.logger import GUILogger
+from gui.logger import gui_logger
 
 
 class ServerManager(BaseManager):
@@ -15,8 +15,8 @@ class ServerManager(BaseManager):
         Path(r"C:\Program Files (x86)\OpenSSH"),
     ]
 
-    def __init__(self, config: ServerConfig, logger: GUILogger):
-        super().__init__(logger)
+    def __init__(self, config: ServerConfig):
+        super().__init__(gui_logger)
         self.config = config
 
     @abstractmethod
@@ -58,9 +58,11 @@ class ServerManager(BaseManager):
 
 class WinServer2016ServerManager(ServerManager, ABC):
 
+    class_name_intro = "=================================== Procesure Server Manager ==================================="
 
-    def __init__(self, config: ServerConfig, logger: GUILogger):
-        super().__init__(config, logger)
+
+    def __init__(self, config: ServerConfig):
+        super().__init__(config)
 
     def check_if_downloaded(self) -> bool:
 
@@ -86,7 +88,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
             f"Remove-Item -Path '{self.program_files_path / 'openssh.zip'}'"
         ]
 
-        status, result = self.execute_command(
+        self.execute_command(
             cmd,
             msg_in=msg_in,
             msg_out=msg_out,
@@ -129,7 +131,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
         msg_out = "Procesure SSH Server installed successfully"
         msg_error = "Failed to install Procesure SSH Server"
 
-        status, result = self.execute_command(
+        self.execute_command(
             [
                 "-ExecutionPolicy", "Bypass",
                 "-File", install_script

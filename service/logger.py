@@ -4,32 +4,34 @@ from pathlib import Path
 
 class ServiceLogger:
 
+    log_file_path: Path = Path(r"C:\ProgramData\Procesure\service.log")
+
     def __init__(self):
-        self.setup()
+        self.logger = self.setup()
 
     @staticmethod
     def setup():
 
-        path = Path(r"C:\ProgramData\Procesure")
-        path.mkdir(exist_ok=True, parents=True)
+        logger = logging.getLogger('ServiceLogger')
+        logger.setLevel(logging.DEBUG)
+        ServiceLogger.log_file_path.parent.mkdir(exist_ok=True)
 
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            filename=path,
-            filemode='a'
-        )
+        if not logger.handlers:
 
-    @staticmethod
-    def log(message: str, level="info"):
+            file_handler = logging.FileHandler(ServiceLogger.log_file_path, mode='a')
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
 
-        if level == 'info':
-            logging.info(message)
-        elif level == 'error':
-            logging.error(message)
-        elif level == 'debug':
-            logging.debug(message)
-        else:
-            logging.warning(message)
+        return logger
+
+
+    def log(self, message: str, level="info"):
+        {
+            'info': self.logger.info,
+            'error': self.logger.error,
+            'debug': self.logger.debug,
+            'warning': self.logger.warning
+        }[level](message)
 
 svc_logger = ServiceLogger()

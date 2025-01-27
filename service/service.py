@@ -5,30 +5,41 @@ import win32event
 import servicemanager
 import sys
 
-from .cmd_executor import CommandExecutor, svc_logger
+from service.cmd_executor import CommandExecutor, svc_logger
 from managers.manager import BaseManager
 
 
 class Service(win32serviceutil.ServiceFramework):
-    
+
     _svc_name_ = "procesure"
-    _svc_display_name_ = "Procesure Service Manager"
-    _svc_description_ = "Manages processes required by Procesure."
+    
+    svc_name = "procesure"
+    svc_display_name = "Procesure Service Manager"
+    svc_description = "Manages processes required by Procesure."
 
     def __init__(self, args):
 
         self.logger = svc_logger
-        self.cmd = CommandExecutor()
-        
         self.logger.log(message="Initiating procesure service")
 
-        super().__init__(args)
+        self.cmd = CommandExecutor()
+        self.logger.log(message="Command executor initiated")
 
-        self.running = True
-        self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-        self.server_process_running: bool = False
-        self.agent_process_running: bool = False
-        
+        try:
+
+            super().__init__(args)
+
+            self.running = True
+            self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
+            self.server_process_running: bool = False
+            self.agent_process_running: bool = False
+
+            self.logger.log(message="Finished instantiating service")
+
+        except BaseException as e:
+            self.logger.log(message=str(e), level="error")
+
+
     def SvcDoRun(self):
 
         """Main service logic."""
@@ -48,33 +59,41 @@ class Service(win32serviceutil.ServiceFramework):
         
     def __start_server(self):
 
-        cmd = [f".//sshd -f '{BaseManager.server_config_path}'"]
-        
-        self.logger.log("Starting Procesure Server")
+        try:
 
-        self.cmd.execute_bkg_command(
-            cmd=cmd,
-            msg_in="Starting Procesure SSH Server",
-            msg_error="Failed to Start Procesure SSH Server",
-            msg_out="Procesure SSH Server started with success",
-            cwd=BaseManager.server_program_files_path
-        )
+            cmd = [f".//sshd -f '{BaseManager.server_config_path}'"]
 
-        self.server_process_running = True
+            self.cmd.execute_bkg_command(
+                cmd=cmd,
+                msg_in="Starting Procesure SSH Server",
+                msg_error="Failed to Start Procesure SSH Server",
+                msg_out="Procesure SSH Server started with success",
+                cwd=BaseManager.server_program_files_path
+            )
+
+            self.server_process_running = True
+
+        except BaseException as e:
+            self.logger.log(str(e))
 
     def __start_agent(self):
 
-        cmd = [f".//agent start --all --config='{BaseManager.agent_config_path}'"]
+        try:
 
-        self.cmd.execute_bkg_command(
-            cmd=cmd,
-            msg_in="Starting Procesure Agent...",
-            msg_out=f"Procesure Agent started successfully.",
-            msg_error="Failed to start Procesure Agent.",
-            cwd=BaseManager.agent_exe_path
-        )
+            cmd = [f".//agent start --all --config='{BaseManager.agent_config_path}'"]
 
-        self.agent_process_running = True
+            self.cmd.execute_bkg_command(
+                cmd=cmd,
+                msg_in="Starting Procesure Agent...",
+                msg_out=f"Procesure Agent started successfully.",
+                msg_error="Failed to start Procesure Agent.",
+                cwd=BaseManager.program_files_path
+            )
+
+            self.agent_process_running = True
+
+        except BaseException as e:
+            self.logger.log(str(e))
 
     def main_loop(self):
         while self.running:
@@ -94,19 +113,6 @@ class Service(win32serviceutil.ServiceFramework):
 
         if not self.agent_process_running:
             self.__start_agent()
-
-    @property
-    def name(self):
-        return self._svc_name_
-    
-    @property
-    def display_name(self):
-        return self._svc_display_name_
-    
-    @property
-    def description(self):
-        return self._svc_description_
-
 
 if __name__ == '__main__':
 

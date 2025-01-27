@@ -7,15 +7,17 @@ from gui.logger import GUILogger
 from managers.manager import BaseManager
 from .models import AgentConfig
 
+from gui.logger import gui_logger
 
 class AgentManager(BaseManager):
 
+    class_name_intro = "=================================== Procesure Agent Manager ==================================="
+
     def __init__(
         self,
-        config: AgentConfig,
-        logger: GUILogger
+        config: AgentConfig
     ):
-        super().__init__(logger)
+        super().__init__(gui_logger)
         self.config: AgentConfig = config
 
     def download(self):

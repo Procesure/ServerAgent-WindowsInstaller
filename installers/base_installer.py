@@ -1,5 +1,5 @@
 import sys
-from gui.gui import QApplication, MultiStepInstaller, GUILogger
+from gui.gui import QApplication, MultiStepInstaller
 from .models import InstallationConfig
 from typing import Callable
 
@@ -11,10 +11,7 @@ class BaseInstaller:
 
     @staticmethod
     def start(
-        install_function: Callable[[
-            InstallationConfig,
-            GUILogger
-        ], None]
+        install_function: Callable[[InstallationConfig], None]
     ):
 
         app = QApplication(sys.argv)

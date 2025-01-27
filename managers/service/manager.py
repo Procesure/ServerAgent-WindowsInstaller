@@ -2,14 +2,16 @@ import shutil
 import win32serviceutil
 import win32service
 from pathlib import Path
-from managers.manager import BaseManager, GUILogger
+from managers.manager import BaseManager
 from service.service import Service
+
+from gui.logger import gui_logger
 
 
 class ServiceManager(BaseManager):
 
-    def __init__(self, logger: GUILogger):
-        super().__init__(logger)
+    def __init__(self):
+        super().__init__(gui_logger)
 
     def to_exe(self):
 
@@ -54,11 +56,11 @@ class ServiceManager(BaseManager):
     def install_service(self):
 
         win32serviceutil.InstallService(
-            exeName=r"C:\Program Files\Procesure\service-manager.exe",
-            pythonClassString=Service.name,
-            serviceName=Service.name,
-            displayName=Service.display_name,
-            description=Service.description,
+            exeName=self.service_exe_path.__str__(),
+            pythonClassString=Service.svc_name,
+            serviceName=Service.svc_name,
+            displayName=Service.svc_display_name,
+            description=Service.svc_description,
             startType=win32service.SERVICE_AUTO_START
         )
 
@@ -75,15 +77,15 @@ class ServiceManager(BaseManager):
             self.logger.log(f"Failed to stop the service: {e}")
 
         try:
-            win32serviceutil.RemoveService(ServiceManager.svc_name)
+            win32serviceutil.RemoveService(Service.svc_name)
             self.logger.log("Service uninstalled successfully.")
         except Exception as e:
             self.logger.log(f"Failed to uninstall the service: {e}")
 
     def start_service(self):
-        win32serviceutil.StartService(ServiceManager.svc_name)
+        win32serviceutil.StartService(Service.svc_name)
         self.logger.log("Service started successfully.")
 
     def stop_service(self):
-        win32serviceutil.StopService(ServiceManager.svc_name)
+        win32serviceutil.StopService(Service.svc_name)
         self.logger.log("Service stopped successfully.")
