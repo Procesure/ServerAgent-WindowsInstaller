@@ -184,6 +184,61 @@ class WinServer2016ServerManager(ServerManager, ABC):
         except Exception as e:
             print(f"Error checking or configuring the firewall rule: {e}")
 
+    def grant_system_user_based_permissions(self):
+
+        """Grant the LocalSystem account access to the .procesure directory, .ssh subdirectory, and authorized_keys file."""
+        self.logger.log("Granting LocalSystem account access to .procesure/ssh")
+
+        cmd_procesure_permissions = [
+            "icacls",
+            f"C:/Users/{self.config.username}/.procesure",
+            "/inheritance:r",
+            "/grant:r",
+            "NT AUTHORITY\\SYSTEM:(OI)(CI)F"
+        ]
+
+        cmd_ssh_permissions = [
+            "icacls",
+            f"C:/Users/{self.config.username}/.procesure/ssh",
+            "/inheritance:r",
+            "/grant:r",
+            "NT AUTHORITY\\SYSTEM:(OI)(CI)F"
+        ]
+
+        cmd_file_permissions = [
+            "icacls",
+            f"C:/Users/{self.config.username}/.procesure/ssh/authorized_keys",
+            "/inheritance:r",
+            "/grant:r",
+            "NT AUTHORITY\\SYSTEM:F"
+        ]
+
+        try:
+            self.execute_command(
+                cmd=cmd_procesure_permissions,
+                msg_in="Granting permissions to .procesure directory...",
+                msg_out="Permissions granted to .procesure directory.",
+                msg_error="Failed to grant permissions to .procesure directory."
+            )
+
+            self.execute_command(
+                cmd=cmd_ssh_permissions,
+                msg_in="Granting permissions to .procesure/ssh directory...",
+                msg_out="Permissions granted to .procesure/ssh directory.",
+                msg_error="Failed to grant permissions to .procesure/ssh directory."
+            )
+
+            self.execute_command(
+                cmd=cmd_file_permissions,
+                msg_in="Granting permissions to authorized_keys file...",
+                msg_out="Permissions granted to authorized_keys file.",
+                msg_error="Failed to grant permissions to authorized_keys file."
+            )
+
+        except Exception as e:
+            self.logger.log(f"Error granting permissions: {e}", level="error")
+            raise
+
     def configure_authorized_keys(self):
 
         self.logger.log("Configuring authorized keys")
@@ -331,6 +386,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
         self.fix_host_file_permissions()
         self.configure_firewall()
         self.configure_authorized_keys()
+        self.grant_system_user_based_permissions()
         self.update_sshd_config()
         self.install_sshd()
 

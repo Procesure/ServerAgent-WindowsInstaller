@@ -11,7 +11,6 @@ MaxAuthTries 6
 MaxSessions 10
 
 PubkeyAuthentication yes
-AuthorizedKeysFile	.ssh/authorized_keys
 
 PasswordAuthentication no
 PermitEmptyPasswords no
@@ -23,8 +22,8 @@ HostKey __PROGRAMDATA__/Procesure/ssh/ssh_host_ecdsa_key
 HostKey __PROGRAMDATA__/Procesure/ssh/ssh_host_ed25519_key
 
 # Other settings
-AllowAgentForwarding yes
-AllowTcpForwarding yes
+AllowAgentForwarding no
+AllowTcpForwarding no
 TCPKeepAlive yes
 
 Subsystem	sftp	sftp-server.exe
