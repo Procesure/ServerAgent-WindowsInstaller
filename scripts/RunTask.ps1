@@ -3,20 +3,32 @@ param (
 )
 
 function Get-MostRecentSessionID {
-    # Retrieve the output of 'query user', skipping the header
-    $queryOutput = query user | Select-Object -Skip 1
+    $username = [Environment]::UserName
+    $queryOutput = query session $username
+    $activeSessionLines = @($queryOutput | Where-Object { $_ -match "\b$username\b" -and $_ -match "Active" })
 
-    # Get the last entry from the output
-    $lastLine = $queryOutput[-1].Trim()
+    Write-Host "Number of active sessions: $($activeSessionLines.Length)"
 
-    # Split the last line by whitespace to extract parts
-    $parts = $lastLine -split '\s+'
+    if ($activeSessionLines) {
+        $activeSessionLine = $activeSessionLines[-1]
+        $parts = $activeSessionLine -replace '^\s+', '' -split '\s+'
 
-    # The session ID should be the third element in the parts array
-    $sessionID = $parts[2]
+        Write-Host "Parts from the last active session line: $parts"
 
-    # Return the session ID
-    return $sessionID
+        if ($parts.Length -gt 3) {
+            $usernameIndex = $parts.IndexOf($username)
+            if ($usernameIndex -gt -1 -and $usernameIndex + 1 -lt $parts.Length) {
+                $sessionID = $parts[$usernameIndex + 1]
+                Write-Host "Extracted session ID: $sessionID"
+                return $sessionID
+            }
+        }
+
+        Write-Host "Parts: $parts"
+        Write-Host "Active session line: $activeSessionLine"
+    } else {
+        Write-Host "No active session found for the user $username."
+    }
 }
 
 function ExecuteCommandInSession {
@@ -26,16 +38,15 @@ function ExecuteCommandInSession {
     )
     $psExecPath = "C:\Windows\System32\PSTools\PsExec.exe"
     $execCommand = "$psExecPath -s -i $SessionID cmd.exe /c `"$Command`""
-    Write-Output "Executing command in session ${SessionID}: $execCommand"
+    Write-Output "Executing command in session {$SessionID}: $execCommand"
     Invoke-Expression $execCommand
-
 }
 
-$mostRecentSession = Get-MostRecentSessionID
-Write-Output $mostRecentSession
-if ($mostRecentSession) {
-    Write-Output "Most recent session ID is $($mostRecentSession)"
-    ExecuteCommandInSession -SessionID $mostRecentSession -Command $ExecutableCommand
+$targetSessionID = Get-MostRecentSessionID
+
+Write-Host "Session ID received: $targetSessionID"
+if ($targetSessionID -ne $null) {
+    ExecuteCommandInSession -SessionID $targetSessionID -Command $ExecutableCommand
 } else {
-    Write-Output "No recent RDP sessions found."
+    Write-Host "No recent RDP sessions found."
 }
