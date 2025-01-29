@@ -107,23 +107,30 @@ class RDPManager(BaseManager):
             msg_out=f"User '{self.config.username}' added to RDP users group."
         )
 
-    def copy_rdp_config_file(self):
-
-        """Copies an RDP configuration file to the specified directory."""
-
-        source_path = "./scripts/config.rdp"
-        destination_path = Path(self.program_data_path / "config.rdp")
-        shutil.copy(source_path, destination_path)
-        self.logger.log(f"RDP configuration file copied to {destination_path}")
-
     def copy_start_rdp_file(self):
 
         """Copies an RDP configuration file to the specified directory."""
 
         source_path = "./scripts/start-rdp.bat"
-        destination_path = Path(self.program_data_path / "start-rdp.bat")
+        destination_path = Path(self.program_files_path / "start-rdp.bat")
+
+        self.logger.log(f"Copying start-rdp.bat file {destination_path}")
+
         shutil.copy(source_path, destination_path)
         self.logger.log(f"Start RDP file copied to {destination_path}")
+
+    def copy_disconnect_session_file(self):
+
+        """Copies DisconnectSession.ps1 to ProgramFiles\Procesure."""
+
+        source_path = Path("./scripts/DisconnectSession.ps1")
+        source_path = source_path.parent.resolve() / "DisconnectSession.ps1"
+        destination_path = Path(self.program_files_path / "DisconnectSession.ps1")
+
+        self.logger.log(f"Copying DisconnectSession.ps1 file {destination_path}")
+
+        shutil.copy(source_path, destination_path)
+        self.logger.log(f"Disconnect Session file copied to {destination_path}")
 
     def handle_installation(self):
 
@@ -136,9 +143,9 @@ class RDPManager(BaseManager):
             self.create_windows_credentials()
             self.update_hosts_file()
             self.add_user_to_remote_desktop_allowed_users()
-            self.copy_rdp_config_file()
             self.copy_start_rdp_file()
+            self.copy_disconnect_session_file()
 
         except Exception as e:
 
-            print(f"Installation failed: {e}")
+            self.logger.log(f"Installation failed: {e}", level="error")

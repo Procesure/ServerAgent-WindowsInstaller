@@ -18,21 +18,21 @@ class WinServer2016Installer(BaseInstaller):
     ):
 
         installation_classes = [
-            #WinServer2016ServerManager(config.server),
-            # AgentManager(config.agent),
-            # RDPManager(config.rdp)
+            WinServer2016ServerManager(config.server),
+            AgentManager(config.agent),
+            RDPManager(config.rdp)
         ]
 
-        # for installation_class in installation_classes:
-        #
-        #     gui_logger.log(message="\n\n\n\n")
-        #     gui_logger.log(message=f"{installation_class.class_name_intro}")
-        #     gui_logger.log(message="\n\n\n\n")
-        #     installation_class.handle_installation()
+        for installation_class in installation_classes:
+
+            gui_logger.log(message="\n\n\n\n")
+            gui_logger.log(message=f"{installation_class.class_name_intro}")
+            gui_logger.log(message="\n\n\n\n")
+            installation_class.handle_installation()
 
         svc_manager = ServiceManager()
         svc_manager.to_exe()
-        # svc_manager.uninstall_service()
-        # svc_manager.install_service()
-        # svc_manager.start_service()
+        svc_manager.uninstall_service()
+        svc_manager.install_service()
+        svc_manager.start_service()
 

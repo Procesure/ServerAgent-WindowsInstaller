@@ -191,29 +191,30 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
         cmd_procesure_permissions = [
             "icacls",
-            f"C:/Users/{self.config.username}/.procesure",
+            f"'{Path(f"C:/Users/{self.config.username}/.procesure")}'",
             "/inheritance:r",
             "/grant:r",
-            "NT AUTHORITY\\SYSTEM:(OI)(CI)F"
+            "'NT AUTHORITY\\SYSTEM:(OI)(CI)F'"
         ]
 
         cmd_ssh_permissions = [
             "icacls",
-            f"C:/Users/{self.config.username}/.procesure/ssh",
+            f"'{Path(f"C:/Users/{self.config.username}/.procesure/ssh")}'",
             "/inheritance:r",
             "/grant:r",
-            "NT AUTHORITY\\SYSTEM:(OI)(CI)F"
+            "'NT AUTHORITY\\SYSTEM:(OI)(CI)F'"
         ]
 
         cmd_file_permissions = [
             "icacls",
-            f"C:/Users/{self.config.username}/.procesure/ssh/authorized_keys",
+            f"'{Path(f"C:/Users/{self.config.username}/.procesure/ssh/authorized_keys")}'",
             "/inheritance:r",
             "/grant:r",
-            "NT AUTHORITY\\SYSTEM:F"
+            "'NT AUTHORITY\\SYSTEM:F'"
         ]
 
         try:
+
             self.execute_command(
                 cmd=cmd_procesure_permissions,
                 msg_in="Granting permissions to .procesure directory...",
@@ -377,7 +378,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
     def handle_installation(self):
 
-        if not self.check_if_installed():
+        if not self.check_if_downloaded():
             self.download()
 
         self.setup_ssh_program_data()

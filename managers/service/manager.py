@@ -1,4 +1,5 @@
 import shutil
+import requests
 import win32serviceutil
 import win32service
 from pathlib import Path
@@ -6,14 +7,21 @@ from managers.manager import BaseManager
 from service.service import Service
 
 from gui.logger import gui_logger
+from pydantic import StrictStr
 
 
 class ServiceManager(BaseManager):
+
+    cpp_redist_exe_download_url: StrictStr = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    vc_redist_path: Path = Path(BaseManager.program_files_path / "vc_redist.exe")
 
     def __init__(self):
         super().__init__(gui_logger)
 
     def to_exe(self):
+
+        self.download_vc_redist()
+        self.install_vc_redist()
 
         svc_manager_path = Path("./service/service.py")
         svc_manager_full_path = Path(svc_manager_path.parent.resolve() / "service.py")
@@ -52,6 +60,52 @@ class ServiceManager(BaseManager):
                 print(f"Failed to move the executable: {e}")
         else:
             print(f"Executable not found in {temp_output_dir}.")
+
+    def download_vc_redist(self):
+
+        """
+        Downloads the Visual C++ Redistributable package and saves it to the Procesure directory.
+        """
+
+        try:
+
+            if self.vc_redist_path.exists():
+                self.logger.log(f"Visual C++ Redistributable already downloaded, skipping download...")
+                return
+
+            self.logger.log(f"Downloading Visual C++ Redistributable from {self.cpp_redist_exe_download_url}...")
+            response = requests.get(self.cpp_redist_exe_download_url, stream=True)
+            response.raise_for_status()
+            with open(self.vc_redist_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            self.logger.log(f"Downloaded Visual C++ Redistributable to {self.vc_redist_path}")
+            return self.vc_redist_path
+        except Exception as e:
+            self.logger.log(f"Failed to download Visual C++ Redistributable: {e}")
+            return None
+
+    def install_vc_redist(self):
+
+        """
+        Installs the Visual C++ Redistributable package from the specified path.
+        """
+
+        try:
+
+            if not self.vc_redist_path.exists():
+                self.logger.log(f"Executable not found at {self.vc_redist_path}")
+                return
+
+            self.execute_command(
+                cmd=[".//vc_redist", "/quiet", "/norestart"],
+                msg_in="Installing Visual C++ Redistributable",
+                msg_out="Visual C++ Redistributable installed successfully.",
+                cwd=self.program_files_path
+            )
+
+        except Exception as e:
+            self.logger.log(f"Failed to install Visual C++ Redistributable: {e}")
 
     def install_service(self):
 
