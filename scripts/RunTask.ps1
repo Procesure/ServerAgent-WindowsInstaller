@@ -3,6 +3,7 @@ param (
 )
 
 function Get-MostRecentSessionID {
+
     $username = [Environment]::UserName
     $queryOutput = query session $username
     $activeSessionLines = @($queryOutput | Where-Object { $_ -match "\b$username\b" -and $_ -match "Active" })
@@ -10,6 +11,7 @@ function Get-MostRecentSessionID {
     Write-Host "Number of active sessions: $($activeSessionLines.Length)"
 
     if ($activeSessionLines) {
+
         $activeSessionLine = $activeSessionLines[-1]
         $parts = $activeSessionLine -replace '^\s+', '' -split '\s+'
 
@@ -29,6 +31,7 @@ function Get-MostRecentSessionID {
     } else {
         Write-Host "No active session found for the user $username."
     }
+
 }
 
 function ExecuteCommandInSession {
@@ -36,10 +39,10 @@ function ExecuteCommandInSession {
         [int]$SessionID,
         [string]$Command
     )
-    $psExecPath = "C:\Windows\System32\PSTools\PsExec.exe"
-    $execCommand = "$psExecPath -s -i $SessionID cmd.exe /c `"$Command`""
+    $psExecPath = '"C:\Program Files\Procesure\PsExec.exe"'
+    $arguments = "-s -i $SessionID cmd.exe /c `"$Command`""  # Construct arguments separately
     Write-Output "Executing command in session {$SessionID}: $execCommand"
-    Invoke-Expression $execCommand
+    Start-Process -FilePath $psExecPath -ArgumentList $arguments -NoNewWindow -Wait
 }
 
 $targetSessionID = Get-MostRecentSessionID

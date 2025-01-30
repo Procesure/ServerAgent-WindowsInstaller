@@ -137,6 +137,7 @@ class ServiceManager(BaseManager):
             self.logger.log(f"Failed to uninstall the service: {e}")
 
     def start_service(self):
+
         win32serviceutil.StartService(Service.svc_name)
         self.logger.log("Service started successfully.")
 

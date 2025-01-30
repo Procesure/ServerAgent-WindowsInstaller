@@ -132,18 +132,6 @@ class RDPManager(BaseManager):
             msg_out=f"User '{self.config.username}' added to RDP users group."
         )
 
-    def copy_start_rdp_file(self):
-
-        """Copies an RDP configuration file to the specified directory."""
-
-        source_path = "./scripts/StartRDP.ps1"
-        destination_path = Path(self.program_files_path / "StartRDP.ps1")
-
-        self.logger.log(f"Copying StartRDP.ps1 file {destination_path}")
-
-        shutil.copy(source_path, destination_path)
-        self.logger.log(f"Start RDP file copied to {destination_path}")
-
     def copy_disconnect_session_file(self):
 
         """Copies DisconnectSession.ps1 to ProgramFiles\Procesure."""
@@ -168,7 +156,6 @@ class RDPManager(BaseManager):
             self.create_windows_credentials()
             self.update_hosts_file()
             self.add_user_to_remote_desktop_allowed_users()
-            self.copy_start_rdp_file()
             self.copy_disconnect_session_file()
             self.download_ps_exec_tools()
 

@@ -187,6 +187,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
     def grant_system_user_based_permissions(self):
 
         """Grant the LocalSystem account access to the .procesure directory, .ssh subdirectory, and authorized_keys file."""
+
         self.logger.log("Granting LocalSystem account access to .procesure/ssh")
 
         cmd_procesure_permissions = [
