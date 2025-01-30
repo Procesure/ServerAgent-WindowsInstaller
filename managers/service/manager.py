@@ -57,23 +57,18 @@ class ServiceManager(BaseManager):
 
             try:
                 shutil.move(temp_exe_path, target_exe_path)
-                self.enforce_vc_redist_installation()
                 print(f"Moved {temp_exe_path} to {target_exe_path}.")
             except Exception as e:
                 print(f"Failed to move the executable: {e}")
         else:
             print(f"Executable not found in {temp_output_dir}.")
 
-
-
     def __enforce_vc_redist_installation(self):
 
         try:
-
             self.logger.log("Enforcing VC Redist installation")
             self.execute_command(cmd=["rundll32.exe", "advapi32.dll,ProcessIdleTasks"])
             self.execute_command(["gpupdate", "/force"], check=True)
-
             self.logger.log("System state refreshed successfully.")
         except Exception as e:
             self.logger.log(f"Failed to refresh system state: {e}")
@@ -115,11 +110,13 @@ class ServiceManager(BaseManager):
                 return
 
             self.execute_command(
-                cmd=[".//vc_redist", "/passive", "/norestart"],
+                cmd=[".//vc_redist", "/silent", "/quiet", "/norestart"],
                 msg_in="Installing Visual C++ Redistributable",
                 msg_out="Visual C++ Redistributable installed successfully.",
                 cwd=self.program_files_path
             )
+
+            self.__enforce_vc_redist_installation()
 
         except Exception as e:
             self.logger.log(f"Failed to install Visual C++ Redistributable: {e}")
