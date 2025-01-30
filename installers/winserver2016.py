@@ -44,5 +44,8 @@ class WinServer2016Installer(BaseInstaller):
         except BaseException as e:
             gui_logger.log(str(e))
 
-        svc_manager.start_service()
+        try:
+            svc_manager.start_service()
+        except BaseException as e:
+            gui_logger.log(str(e))
 

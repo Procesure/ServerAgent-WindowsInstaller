@@ -20,7 +20,7 @@ class BaseManager:
     agent_exe_path: Path = program_files_path / "agent.exe"
     agent_config_path: Path = program_data_path / "agent-config.yml"
 
-    service_exe_path: Path = Path(r"C:\Program Files\Procesure\service.exe")
+    service_exe_path: Path = Path(r"C:\Program Files\Procesure\procesure-svc.exe")
 
     powershell: Path = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
 

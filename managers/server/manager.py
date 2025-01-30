@@ -127,7 +127,7 @@ class WinServer2016ServerManager(ServerManager, ABC):
 
         install_script = "install-sshd.ps1"
 
-        msg_in = f"Installing Procesure Server from {self.server_program_files_path / install_script}...",
+        msg_in = f"Installing Procesure Server from {self.server_program_files_path / install_script}..."
         msg_out = "Procesure SSH Server installed successfully"
         msg_error = "Failed to install Procesure SSH Server"
 
@@ -241,26 +241,31 @@ class WinServer2016ServerManager(ServerManager, ABC):
             self.logger.log(f"Error granting permissions: {e}", level="error")
             raise
 
-    def configure_authorized_keys(self):
+    from pathlib import Path
+    import shutil
 
+    def configure_authorized_keys(self):
         self.logger.log("Configuring authorized keys")
 
         try:
-
             user_ssh_path = Path(f"C:/Users/{self.config.username}/.procesure/ssh")
-            user_ssh_path.mkdir(parents=True, exist_ok=True)
+
+            # Remove the directory if it exists and recreate it
+            if user_ssh_path.exists():
+                shutil.rmtree(user_ssh_path)
+            user_ssh_path.mkdir(parents=True, exist_ok=False)
 
             authorized_keys_path = user_ssh_path / "authorized_keys"
+            authorized_keys_path.touch()
 
-            if not authorized_keys_path.exists():
-                authorized_keys_path.touch()
-
+            # Write the public key if it's not already present
             with authorized_keys_path.open("a+") as f:
                 f.seek(0)
                 existing_keys = f.read()
                 if self.config.public_key not in existing_keys:
                     f.write(f"{self.config.public_key}\n")
 
+            # Change folder permissions
             self.execute_command(
                 [
                     "icacls",
