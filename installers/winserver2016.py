@@ -3,9 +3,7 @@ from managers.service.manager import ServiceManager
 from managers.agent.manager import AgentManager
 from managers.rdp.manager import RDPManager
 from managers.task.manager import TaskManager
-
 from installers.base_installer import BaseInstaller
-
 from .models import *
 
 
@@ -35,7 +33,16 @@ class WinServer2016Installer(BaseInstaller):
 
         svc_manager = ServiceManager()
         svc_manager.to_exe()
-        svc_manager.uninstall_service()
-        svc_manager.install_service()
+
+        try:
+            svc_manager.uninstall_service()
+        except BaseException as e:
+            gui_logger.log(str(e))
+
+        try:
+            svc_manager.install_service()
+        except BaseException as e:
+            gui_logger.log(str(e))
+
         svc_manager.start_service()
 

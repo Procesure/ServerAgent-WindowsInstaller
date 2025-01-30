@@ -7,6 +7,8 @@ from pathlib import Path
 
 class TaskManager(BaseManager):
 
+    class_name_intro = "=================================== Procesure RDP Manager ==================================="
+
     def __init__(self):
         super().__init__(gui_logger)
 

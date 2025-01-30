@@ -4,6 +4,7 @@ import win32service
 import win32event
 import servicemanager
 import sys
+import psutil
 
 from service.cmd_executor import CommandExecutor, svc_logger
 from managers.manager import BaseManager
@@ -44,7 +45,7 @@ class Service(win32serviceutil.ServiceFramework):
 
         """Main service logic."""
 
-        self.logger.log(message="Accessing service entry point")
+        self.logger.log(message="Running service")
         self.ReportServiceStatus(win32service.SERVICE_RUNNING)
         self.main_loop()
         win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)
@@ -53,9 +54,74 @@ class Service(win32serviceutil.ServiceFramework):
 
         """Cleanup logic when the service stops."""
 
+        self.logger.log(message="Stop service signal received.")
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-        win32event.SetEvent(self.stop_event)
+
+        self.__stop_process_by_path(BaseManager.server_exe_path.__str__())
+        self.__stop_process_by_path(BaseManager.agent_exe_path.__str__())
+
+        win32event.SetEvent(self.hWaitStop)
         self.running = False
+
+    def __stop_process_by_path(self, executable_path: str):
+
+        """
+        Stops processes that match the specified executable path.
+
+        :param executable_path: Full path to the executable to look for, case-insensitively.
+        """
+
+        executable_path = executable_path.lower()
+
+        for proc in psutil.process_iter(['pid', 'name', 'exe']):
+            try:
+                if proc.info['exe'] and proc.info['exe'].lower() == executable_path:
+                    self.logger.log(f"Stopping {proc.info['name']} with PID {proc.info['pid']}")
+                    proc.terminate()
+                    proc.wait(timeout=3)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+            except psutil.TimeoutExpired:
+                print(f"Process {proc.info['pid']} did not terminate in time and will be killed.")
+                proc.kill()
+
+        self.logger.log("Process stop attempt completed.")
+
+    def __stop_server(self):
+
+        """Method to stop the SSH server."""
+
+        if self.server_process_running:
+            try:
+                stop_cmd = [".//sshd -f '{0}' -O stop".format(BaseManager.server_config_path)]
+                self.cmd.execute_bkg_command(
+                    cmd=stop_cmd,
+                    msg_in="Stopping Procesure SSH Server",
+                    msg_out="Procesure SSH Server stopped successfully.",
+                    msg_error="Failed to stop Procesure SSH Server",
+                    cwd=BaseManager.server_program_files_path
+                )
+                self.server_process_running = False
+            except BaseException as e:
+                self.logger.log(str(e), level="error")
+
+    def __stop_agent(self):
+
+        """Method to stop the Ngrok agent."""
+
+        if self.agent_process_running:
+            try:
+                stop_cmd = [".//agent stop --all --config='{0}'".format(BaseManager.agent_config_path)]
+                self.cmd.execute_bkg_command(
+                    cmd=stop_cmd,
+                    msg_in="Stopping Procesure Agent...",
+                    msg_out="Procesure Agent stopped successfully.",
+                    msg_error="Failed to stop Procesure Agent.",
+                    cwd=BaseManager.program_files_path
+                )
+                self.agent_process_running = False
+            except BaseException as e:
+                self.logger.log(str(e), level="error")
         
     def __start_server(self):
 
@@ -96,6 +162,9 @@ class Service(win32serviceutil.ServiceFramework):
             self.logger.log(str(e))
 
     def main_loop(self):
+
+        self.logger.log("Entering service main loop")
+
         while self.running:
             try:
                 self.main()
@@ -106,7 +175,7 @@ class Service(win32serviceutil.ServiceFramework):
 
     def main(self):
 
-        self.logger.log(message="Entering main method")
+        self.logger.log(message="Entering service logic method")
 
         if not self.server_process_running:
             self.__start_server()

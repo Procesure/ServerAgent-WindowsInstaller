@@ -9,6 +9,6 @@ load_dotenv()
 if __name__ == "__main__":
 
     installer = WinServer2016Installer()
-    installer.handle_installations(installation_config)
-    # installer.start(installer.handle_installations)e
+    # installer.handle_installations(installation_config)
+    installer.start(installer.handle_installations)
 
