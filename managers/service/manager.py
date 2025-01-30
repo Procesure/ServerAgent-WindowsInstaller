@@ -68,7 +68,7 @@ class ServiceManager(BaseManager):
         try:
             self.logger.log("Enforcing VC Redist installation")
             self.execute_command(cmd=["rundll32.exe", "advapi32.dll,ProcessIdleTasks"])
-            self.execute_command(["gpupdate", "/force"], check=True)
+            self.execute_command(["gpupdate", "/force"])
             self.logger.log("System state refreshed successfully.")
         except Exception as e:
             self.logger.log(f"Failed to refresh system state: {e}")
@@ -116,7 +116,7 @@ class ServiceManager(BaseManager):
                 cwd=self.program_files_path
             )
 
-            self.__enforce_vc_redist_installation()
+            # self.__enforce_vc_redist_installation()
 
         except Exception as e:
             self.logger.log(f"Failed to install Visual C++ Redistributable: {e}")
