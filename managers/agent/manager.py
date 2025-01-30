@@ -12,6 +12,7 @@ from gui.logger import gui_logger
 class AgentManager(BaseManager):
 
     class_name_intro = "=================================== Procesure Agent Manager ==================================="
+    agent_exe_download_url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip"
 
     def __init__(
         self,
@@ -24,7 +25,6 @@ class AgentManager(BaseManager):
 
         """Download and install agent (agent)."""
 
-        procesure_url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip"
         procesure_zip = self.program_files_path / "agent.zip"
 
         try:
@@ -34,7 +34,7 @@ class AgentManager(BaseManager):
                 return
 
             self.logger.log("Downloading Procesure Agent...")
-            response = requests.get(procesure_url)
+            response = requests.get(self.agent_exe_download_url)
             response.raise_for_status()
 
             with open(procesure_zip, "wb") as f:

@@ -1,7 +1,10 @@
 import os
 import shutil
+import requests
+import zipfile
 
 from pathlib import Path
+from io import BytesIO
 
 from managers.manager import BaseManager
 from .models import *
@@ -14,12 +17,34 @@ class RDPManager(BaseManager):
     class_name_intro = "=================================== Procesure RDP Manager ==================================="
 
     alias_ip: StrictStr = "127.0.0.2"
-    alias_name: StrictStr = "agent"
+    alias_name: StrictStr = "procesure"
+
+    ps_exec_tools_download_url: StrictStr = "https://download.sysinternals.com/files/PSTools.zip"
 
     def __init__(self, config: RDPConfig):
 
         super().__init__(gui_logger)
         self.config: RDPConfig = config
+
+    def download_ps_exec_tools(self):
+
+        self.logger.log(message="Downloading PSExec Tools...")
+
+        try:
+
+            response = requests.get(self.ps_exec_tools_download_url)
+            response.raise_for_status()
+            zip_file_bytes = BytesIO(response.content)
+
+            with zipfile.ZipFile(zip_file_bytes) as zip_file:
+                psexec_path = 'PsExec.exe'
+                zip_file.extract(psexec_path, path=self.program_files_path)
+            print("PSExec tools downloaded and extracted successfully.")
+
+        except requests.RequestException as e:
+            print(f"Failed to download the file: {e}")
+        except zipfile.BadZipFile:
+            print("The downloaded file is not a zip file or it is corrupt.")
 
     def enable_rdp(self):
 
@@ -111,10 +136,10 @@ class RDPManager(BaseManager):
 
         """Copies an RDP configuration file to the specified directory."""
 
-        source_path = "./scripts/start-rdp.bat"
-        destination_path = Path(self.program_files_path / "start-rdp.bat")
+        source_path = "./scripts/StartRDP.ps1"
+        destination_path = Path(self.program_files_path / "StartRDP.ps1")
 
-        self.logger.log(f"Copying start-rdp.bat file {destination_path}")
+        self.logger.log(f"Copying StartRDP.ps1 file {destination_path}")
 
         shutil.copy(source_path, destination_path)
         self.logger.log(f"Start RDP file copied to {destination_path}")
@@ -145,6 +170,7 @@ class RDPManager(BaseManager):
             self.add_user_to_remote_desktop_allowed_users()
             self.copy_start_rdp_file()
             self.copy_disconnect_session_file()
+            self.download_ps_exec_tools()
 
         except Exception as e:
 
