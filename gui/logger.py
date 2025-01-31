@@ -43,4 +43,6 @@ class GUILogger:
             'warning': self.logger.warning
         }[level](message)
 
+        print(message)
+
 gui_logger = GUILogger()

@@ -3,7 +3,9 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QStackedWidget
 )
+
 from PyQt5.QtCore import pyqtSignal, QThread, Qt
+from typing import Any
 
 from .logger import gui_logger
 
@@ -12,7 +14,7 @@ from installers.models import InstallationConfig
 
 class InstallationWorker(QThread):
 
-    finished = pyqtSignal(str)  # Signal to emit completion message
+    finished = pyqtSignal(str, bool)
 
     def __init__(
         self,
@@ -26,10 +28,12 @@ class InstallationWorker(QThread):
 
     def run(self) -> None:
         try:
+            gui_logger.log("Starting Installation")
             self.install_function(self.config)
-            self.finished.emit("Installation complete.")
+            gui_logger.log("Finished installation successfully")
+            self.finished.emit("Installation complete.", True)
         except Exception as e:
-            self.finished.emit(f"Installation error: {e}")
+            self.finished.emit(f"Installation error: {e}", False)
 
 
 class MultiStepInstaller(QMainWindow):
@@ -72,6 +76,7 @@ class MultiStepInstaller(QMainWindow):
         self.log_output.setReadOnly(True)
         self.steps.addWidget(self.step1)
         self.steps.addWidget(self.step2)
+        self.steps.addWidget(self.step3)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
@@ -166,6 +171,7 @@ class MultiStepInstaller(QMainWindow):
             self.config.rdp.password = password
 
     def show_step(self, step_index: int) -> None:
+
         self.steps.setCurrentIndex(step_index)
         if step_index == 2:
             self.start_installation()
@@ -205,16 +211,23 @@ class MultiStepInstaller(QMainWindow):
 
         return step
 
-    def create_step3(self):
+    def create_step3(self) -> QWidget:
+
+        """
+        Creates the final step with a success message and a close button.
+        """
 
         step = QWidget()
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Installation Progress"))
 
-        self.finish_button = QPushButton("Finish Installation", clicked=self.finish_installation)
-        self.finish_button.setEnabled(False)  # Disable until installation is complete
+        success_label = QLabel("Installation was successful!")
+        success_label.setAlignment(Qt.AlignCenter)
 
-        layout.addWidget(self.finish_button)
+        close_button = QPushButton("Close", clicked=self.close)
+        close_button.setStyleSheet("background-color: green; color: white; padding: 10px;")
+
+        layout.addWidget(success_label)
+        layout.addWidget(close_button)
         step.setLayout(layout)
 
         return step
@@ -228,8 +241,11 @@ class MultiStepInstaller(QMainWindow):
             install_function=self.install_function
         )
 
+        self.install_function(self.config)
+
         self.worker.finished.connect(self.on_installation_finished)
         self.worker.start()
+
 
     def on_installation_finished(self, message: str, success: bool):
 
@@ -237,6 +253,7 @@ class MultiStepInstaller(QMainWindow):
 
         if success:
             self.finish_button.setEnabled(True)
+            self.show_step(2)
 
     def finish_installation(self):
         self.close()
